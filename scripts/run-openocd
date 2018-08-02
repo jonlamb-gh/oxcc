@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
+openocd -f board/stm32f7discovery.cfg
+
+exit 0
