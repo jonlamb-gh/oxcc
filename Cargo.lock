@@ -1,0 +1,4 @@
+[[package]]
+name = "rust-oscc"
+version = "0.0.1"
+
