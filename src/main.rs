@@ -10,11 +10,13 @@ extern crate panic_semihosting;
 #[macro_use(block)]
 extern crate nb;
 
+mod debug;
 mod fault_condition;
 mod pid;
 mod throttle_module;
 
 use core::fmt::Write;
+use debug::DebugOutputHandle;
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::flash::FlashExt;
 use nucleo_f767zi::hal::prelude::*;
@@ -45,7 +47,8 @@ fn main() -> ! {
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
     //
     // TODO - alternate clock configuration, breaks delay currently
-    //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut flash.acr);
+    //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut
+    // flash.acr);
 
     writeln!(stdout, "sysclk = {} Hz", clocks.sysclk().0);
     writeln!(stdout, "pclk1 = {} Hz", clocks.pclk1().0);
@@ -71,10 +74,9 @@ fn main() -> ! {
         clocks,
         &mut rcc.apb1,
     );
-    let (mut tx, mut rx) = serial.split();
+    let (mut tx, _rx) = serial.split();
 
-    // sending this over serial
-    let string_to_send = "a string being sent\r\n";
+    let mut debugout = DebugOutputHandle::init(&mut tx);
 
     let mut led_state = false;
     loop {
@@ -85,10 +87,9 @@ fn main() -> ! {
         }
         led_state = !led_state;
 
-        for c in string_to_send.chars() {
-            block!(tx.write(c as _)).ok();
-        }
+        writeln!(debugout, "Message on the debug console");
 
+        // 1 second
         delay.delay_ms(1_000_u16);
     }
 }

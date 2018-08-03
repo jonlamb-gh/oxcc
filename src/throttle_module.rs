@@ -47,4 +47,12 @@ impl ThrottleModule {
             operator_override_state: FaultCondition::new(),
         }
     }
+
+    // TODO
+    pub fn disable_control(&mut self) {
+        //
+    }
+
+    // TODO - need ADC
+    //fn read_accelerator_position_sensor(&self) -> AcceleratorPosition {
 }
