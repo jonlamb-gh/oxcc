@@ -76,6 +76,7 @@ dependencies = [
  "cortex-m 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m-rt 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m-semihosting 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nucleo-f767zi 0.0.1 (git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel)",
  "panic-semihosting 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -108,7 +109,7 @@ dependencies = [
 [[package]]
 name = "stm32f767-hal"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#f7c4e50001f750b662154dd556ce59ef1bd81720"
+source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#94bfdf908c776fd0004d9ad425578689eee5837b"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
