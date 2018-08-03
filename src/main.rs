@@ -15,10 +15,10 @@ mod pid;
 mod throttle_module;
 
 use core::fmt::Write;
-use cortex_m::peripheral::syst::SystClkSource;
+use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::flash::FlashExt;
 use nucleo_f767zi::hal::prelude::*;
-use nucleo_f767zi::hal::serial::*;
+use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
 use nucleo_f767zi::led::Leds;
@@ -28,22 +28,28 @@ use sh::hio;
 entry!(main);
 
 fn main() -> ! {
+    // stdout is routed through stlink semihosting
     let mut stdout = hio::hstdout().unwrap();
     writeln!(stdout, "Starting").unwrap();
 
-    let cm_peripherals = cortex_m::Peripherals::take().unwrap();
+    let core_peripherals = cortex_m::Peripherals::take().unwrap();
     let peripherals = stm32f7x7::Peripherals::take().unwrap();
 
     let mut flash = peripherals.FLASH.constrain();
     let mut rcc = peripherals.RCC.constrain();
 
-    let gpiob = peripherals.GPIOB.split(&mut rcc.ahb);
-    let gpiod = peripherals.GPIOD.split(&mut rcc.ahb);
+    let mut gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
+    let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
 
-    let mut syst = cm_peripherals.SYST;
+    // default clock configuration runs at 16 MHz
+    let clocks = rcc.cfgr.freeze(&mut flash.acr);
+    //
+    // TODO - alternate clock configuration, breaks delay currently
+    //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut flash.acr);
 
-    // TODO - fix/enable RCC bits in HAL
-    //let clocks = rcc.cfgr.freeze(&mut flash.acr);
+    writeln!(stdout, "sysclk = {} Hz", clocks.sysclk().0);
+    writeln!(stdout, "pclk1 = {} Hz", clocks.pclk1().0);
+    writeln!(stdout, "pclk2 = {} Hz", clocks.pclk2().0);
 
     let mut leds = Leds::new(gpiob);
     for led in leds.iter_mut() {
@@ -51,25 +57,27 @@ fn main() -> ! {
     }
     leds[led::Color::Blue].on();
 
-    // TODO - need RCC bits to get full clock speed
-    syst.set_clock_source(SystClkSource::Core);
-    syst.set_reload(8_000_000); // 1s
-    syst.enable_counter();
+    let mut delay = Delay::new(core_peripherals.SYST, clocks);
 
-    /* TODO - need RCC bits for this
     let tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
     let rx = gpiod.pd9.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
-    let serial = Serial::usart3(p.USART3, (tx, rx), 9_600.bps(), clocks, &mut rcc.apb1);
+
+    // USART3 is routed up to the same USB port as the stlink
+    // shows up as /dev/ttyACM0 for me
+    let serial = Serial::usart3(
+        peripherals.USART3,
+        (tx, rx),
+        115_200.bps(),
+        clocks,
+        &mut rcc.apb1,
+    );
     let (mut tx, mut rx) = serial.split();
 
-    let sent = b'X';
-    block!(tx.write(sent)).ok();
-    */
+    // sending this over serial
+    let string_to_send = "a string being sent\r\n";
 
     let mut led_state = false;
     loop {
-        while !syst.has_wrapped() {}
-
         if led_state {
             leds[led::Color::Green].on();
         } else {
@@ -77,7 +85,11 @@ fn main() -> ! {
         }
         led_state = !led_state;
 
-        writeln!(stdout, "SYST wrapped").unwrap();
+        for c in string_to_send.chars() {
+            block!(tx.write(c as _)).ok();
+        }
+
+        delay.delay_ms(1_000_u16);
     }
 }
 
