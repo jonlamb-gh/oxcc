@@ -3,6 +3,14 @@
 ## Building
 
 ```bash
+rustup default nightly
+
+rustup component add rust-src
+
+rustup target add thumbv7em-none-eabihf
+```
+
+```bash
 # rustc 1.29.0-nightly (54628c8ea 2018-07-30)
 cargo build
 ```
