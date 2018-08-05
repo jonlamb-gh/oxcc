@@ -3,6 +3,7 @@
 use core::fmt::Write;
 use cortex_m;
 use dac_mcp49xx::Mcp49xx;
+use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::flash::FlashExt;
@@ -28,6 +29,7 @@ pub struct Board {
     pub debug_console: DebugConsole,
     pub leds: Leds,
     pub delay: Delay,
+    pub timer_ms: MsTimer,
     pub dac: Mcp49xx,
     pub throttle_spoof_enable: ThrottleSpoofEnable,
 }
@@ -62,6 +64,12 @@ impl Board {
         //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut
         // flash.acr);
 
+        // TODO - should be some safe high level API
+        unsafe {
+            // unlock registers to enable DWT cycle counter for MsTimer
+            core_peripherals.DWT.lar.write(0xC5ACCE55);
+        }
+
         writeln!(semihost_console, "sysclk = {} Hz", clocks.sysclk().0);
         writeln!(semihost_console, "pclk1 = {} Hz", clocks.pclk1().0);
         writeln!(semihost_console, "pclk2 = {} Hz", clocks.pclk2().0);
@@ -86,6 +94,7 @@ impl Board {
             debug_console: DebugConsole::new(serial),
             leds,
             delay: Delay::new(core_peripherals.SYST, clocks),
+            timer_ms: MsTimer::new(core_peripherals.DWT, clocks),
             dac: Mcp49xx::new(),
             throttle_spoof_enable,
         }

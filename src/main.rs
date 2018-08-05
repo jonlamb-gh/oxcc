@@ -15,6 +15,7 @@ extern crate panic_semihosting;
 mod board;
 mod dac_mcp49xx;
 mod fault_condition;
+mod ms_timer;
 mod pid;
 mod throttle_module;
 
@@ -68,7 +69,11 @@ fn main() -> ! {
         }
         led_state = !led_state;
 
-        writeln!(board.debug_console, "Message on the debug console");
+        writeln!(
+            board.debug_console,
+            "Message on the debug console time_ms = {}",
+            board.timer_ms.ms()
+        );
 
         // 1 second
         board.delay.delay_ms(1_000_u16);
