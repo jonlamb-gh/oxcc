@@ -1,12 +1,13 @@
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.cpp
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.h#L19
+
 pub struct FaultCondition {
     monitoring_active: bool,
     condition_start_time: u32,
 }
 
 impl FaultCondition {
-    pub fn new() -> FaultCondition {
+    pub const fn new() -> Self {
         FaultCondition {
             monitoring_active: false,
             condition_start_time: 0,

@@ -1,97 +1,73 @@
-#![no_main]
 #![no_std]
+#![no_main]
+#![feature(const_fn)]
 
 extern crate cortex_m;
 #[macro_use]
 extern crate cortex_m_rt as rt;
 extern crate cortex_m_semihosting as sh;
+#[macro_use]
+extern crate stm32f7;
 extern crate nucleo_f767zi;
 extern crate panic_semihosting;
-#[macro_use(block)]
-extern crate nb;
 
-mod debug;
+mod board;
 mod fault_condition;
 mod pid;
 mod throttle_module;
 
+use board::Board;
+use core::cell::RefCell;
 use core::fmt::Write;
-use debug::DebugOutputHandle;
+use cortex_m::interrupt::Mutex;
 use nucleo_f767zi::hal::delay::Delay;
-use nucleo_f767zi::hal::flash::FlashExt;
 use nucleo_f767zi::hal::prelude::*;
-use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
-use nucleo_f767zi::led::Leds;
 use rt::ExceptionFrame;
-use sh::hio;
+use throttle_module::ThrottleModule;
+
+// Interrupt safe access
+/*
+static THROTTLE_MODULE: Mutex<RefCell<throttle_module::ThrottleModule>> =
+    Mutex::new(RefCell::new(throttle_module::ThrottleModule::new()));
+*/
 
 entry!(main);
 
 fn main() -> ! {
-    // stdout is routed through stlink semihosting
-    let mut stdout = hio::hstdout().unwrap();
-    writeln!(stdout, "Starting").unwrap();
+    let mut board = Board::new();
 
-    let core_peripherals = cortex_m::Peripherals::take().unwrap();
-    let peripherals = stm32f7x7::Peripherals::take().unwrap();
+    board.leds[led::Color::Blue].on();
 
-    let mut flash = peripherals.FLASH.constrain();
-    let mut rcc = peripherals.RCC.constrain();
-
-    let mut gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
-    let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
-
-    // default clock configuration runs at 16 MHz
-    let clocks = rcc.cfgr.freeze(&mut flash.acr);
-    //
-    // TODO - alternate clock configuration, breaks delay currently
-    //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut
-    // flash.acr);
-
-    writeln!(stdout, "sysclk = {} Hz", clocks.sysclk().0);
-    writeln!(stdout, "pclk1 = {} Hz", clocks.pclk1().0);
-    writeln!(stdout, "pclk2 = {} Hz", clocks.pclk2().0);
-
-    let mut leds = Leds::new(gpiob);
-    for led in leds.iter_mut() {
-        led.off();
-    }
-    leds[led::Color::Blue].on();
-
-    let mut delay = Delay::new(core_peripherals.SYST, clocks);
-
-    let tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
-    let rx = gpiod.pd9.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
-
-    // USART3 is routed up to the same USB port as the stlink
-    // shows up as /dev/ttyACM0 for me
-    let serial = Serial::usart3(
-        peripherals.USART3,
-        (tx, rx),
-        115_200.bps(),
-        clocks,
-        &mut rcc.apb1,
-    );
-    let (mut tx, _rx) = serial.split();
-
-    let mut debugout = DebugOutputHandle::init(&mut tx);
+    let throttle = ThrottleModule::new();
 
     let mut led_state = false;
     loop {
         if led_state {
-            leds[led::Color::Green].on();
+            board.leds[led::Color::Green].on();
         } else {
-            leds[led::Color::Green].off();
+            board.leds[led::Color::Green].off();
         }
         led_state = !led_state;
 
-        writeln!(debugout, "Message on the debug console");
+        writeln!(board.debug_console, "Message on the debug console");
 
         // 1 second
-        delay.delay_ms(1_000_u16);
+        board.delay.delay_ms(1_000_u16);
     }
+}
+
+// ADC1 global interrupt
+interrupt!(ADC, adc_isr);
+
+// TODO might have to use unsafe style like here in RCC
+// https://github.com/jonlamb-gh/stm32f767-hal/blob/devel/src/rcc.rs#L262
+fn adc_isr() {
+    cortex_m::interrupt::free(|cs| {
+        //let p = stm32f7x7::Peripherals::take();
+        //THROTTLE_MODULE.adc_input(...);
+    });
 }
 
 exception!(HardFault, hard_fault);
