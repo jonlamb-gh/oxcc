@@ -9,12 +9,18 @@ extern crate cortex_m_semihosting as sh;
 #[macro_use]
 extern crate stm32f7;
 extern crate nucleo_f767zi;
+extern crate num;
 extern crate panic_semihosting;
 
 mod board;
+mod dac_mcp49xx;
 mod fault_condition;
 mod pid;
 mod throttle_module;
+
+// TODO - feature gate this as vehicle
+#[path = "vehicles/kial_soul_ev.rs"]
+mod kial_soul_ev;
 
 use board::Board;
 use core::cell::RefCell;
@@ -38,12 +44,23 @@ entry!(main);
 fn main() -> ! {
     let mut board = Board::new();
 
+    // TODO - just for testing
     board.leds[led::Color::Blue].on();
 
-    let throttle = ThrottleModule::new();
+    let mut throttle = ThrottleModule::new();
 
     let mut led_state = false;
     loop {
+        // TODO - could fill up a global buffer of sorts and sample them here
+        // instead of making the objects global/atomic
+        /*
+        if false {
+            throttle.adc_input(0, 0);
+        }
+        */
+
+        throttle.check_for_faults(&mut board);
+
         if led_state {
             board.leds[led::Color::Green].on();
         } else {
@@ -64,14 +81,18 @@ interrupt!(ADC, adc_isr);
 // TODO might have to use unsafe style like here in RCC
 // https://github.com/jonlamb-gh/stm32f767-hal/blob/devel/src/rcc.rs#L262
 fn adc_isr() {
+    /*
     cortex_m::interrupt::free(|cs| {
-        //let p = stm32f7x7::Peripherals::take();
-        //THROTTLE_MODULE.adc_input(...);
+        let p = stm32f7x7::Peripherals::take();
+        THROTTLE_MODULE.adc_input(...);
     });
+    */
 }
 
 exception!(HardFault, hard_fault);
 
+// TODO - any safety related things we can do in these contexts (disable
+// controls, LEDs, etc)?
 fn hard_fault(ef: &ExceptionFrame) -> ! {
     panic!("HardFault at {:#?}", ef);
 }

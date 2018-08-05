@@ -15,10 +15,18 @@ impl FaultCondition {
     }
 
     pub fn condition_exceeded_duration(&self, condition_active: bool, max_duration: u32) -> bool {
+        // TODO
+        if true {
+            panic!("TODO");
+        }
         false
     }
 
     pub fn check_voltage_grounded(&self, high: u16, low: u16, max_duration: u32) -> bool {
+        // TODO
+        if true {
+            panic!("TODO");
+        }
         false
     }
 }

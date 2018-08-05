@@ -2,6 +2,7 @@
 
 use core::fmt::Write;
 use cortex_m;
+use dac_mcp49xx::Mcp49xx;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::flash::FlashExt;
@@ -19,12 +20,15 @@ use sh::hio;
 // - debug_println! -> ITM/semihosting link
 
 type ThrottleSpoofEnable = PD10<Output<PushPull>>;
+//type AcceleratorPositionSensorHigh
+//type AcceleratorPositionSensorLow
 
 pub struct Board {
     pub semihost_console: hio::HStdout,
     pub debug_console: DebugConsole,
     pub leds: Leds,
     pub delay: Delay,
+    pub dac: Mcp49xx,
     pub throttle_spoof_enable: ThrottleSpoofEnable,
 }
 
@@ -67,8 +71,6 @@ impl Board {
             led.off();
         }
 
-        let mut delay = Delay::new(core_peripherals.SYST, clocks);
-
         // USART3 is routed up to the same USB port as the stlink
         // shows up as /dev/ttyACM0 for me
         let serial = Serial::usart3(
@@ -79,13 +81,12 @@ impl Board {
             &mut rcc.apb1,
         );
 
-        let mut debug_console = DebugConsole::new(serial);
-
         Board {
             semihost_console,
-            debug_console,
+            debug_console: DebugConsole::new(serial),
             leds,
-            delay,
+            delay: Delay::new(core_peripherals.SYST, clocks),
+            dac: Mcp49xx::new(),
             throttle_spoof_enable,
         }
     }

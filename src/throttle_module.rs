@@ -6,6 +6,10 @@ use board::Board;
 use core::fmt::Write;
 use fault_condition::FaultCondition;
 use nucleo_f767zi::hal::prelude::*;
+use num;
+
+// TODO feature gate vehicles
+use kial_soul_ev::*;
 
 struct AcceleratorPosition {
     low: u16,
@@ -53,8 +57,11 @@ impl ThrottleModule {
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.throttle_control_state.enabled {
-            // TODO
-            //prevent_signal_disc...
+            // TODO - revist this
+            board.dac.prevent_signal_discontinuity(
+                self.accelerator_position.low,
+                self.accelerator_position.high,
+            );
 
             board.throttle_spoof_enable.set_low();
             self.throttle_control_state.enabled = false;
@@ -64,8 +71,11 @@ impl ThrottleModule {
 
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.throttle_control_state.enabled && !self.throttle_control_state.operator_override {
-            // TODO
-            //prevent_signal_disc...
+            // TODO - revist this
+            board.dac.prevent_signal_discontinuity(
+                self.accelerator_position.low,
+                self.accelerator_position.high,
+            );
 
             board.throttle_spoof_enable.set_high();
             self.throttle_control_state.enabled = true;
@@ -73,10 +83,26 @@ impl ThrottleModule {
         }
     }
 
-    pub fn update_throttle(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
+    pub fn update_throttle(
+        &mut self,
+        spoof_command_high: u16,
+        spoof_command_low: u16,
+        board: &mut Board,
+    ) {
         if self.throttle_control_state.enabled {
-            // TODO
-            // DAC output
+            let spoof_high = num::clamp(
+                spoof_command_high,
+                THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MIN,
+                THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MAX,
+            );
+
+            let spoof_low = num::clamp(
+                spoof_command_low,
+                THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MIN,
+                THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MAX,
+            );
+
+            board.dac.set_outputs(spoof_high, spoof_low);
         }
     }
 
@@ -87,6 +113,53 @@ impl ThrottleModule {
     }
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
-        // TODO
+        if self.throttle_control_state.enabled && self.throttle_control_state.dtcs > 0 {
+            let accelerator_position_average: u32 =
+                (self.accelerator_position.low as u32 + self.accelerator_position.high as u32) / 2;
+
+            let operator_overridden: bool =
+                self.operator_override_state.condition_exceeded_duration(
+                    accelerator_position_average >= ACCELERATOR_OVERRIDE_THRESHOLD,
+                    FAULT_HYSTERESIS,
+                );
+
+            let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
+                self.accelerator_position.high,
+                self.accelerator_position.low,
+                FAULT_HYSTERESIS,
+            );
+
+            // sensor pins tied to ground - a value of zero indicates disconnection
+            if inputs_grounded {
+                self.disable_control(board);
+
+                // TODO
+                // DTC get/set/etc
+
+                // TODO
+                // CAN comms
+
+                writeln!(
+                    board.debug_console,
+                    "Bad value read from accelerator position sensor"
+                );
+            } else if operator_overridden {
+                self.disable_control(board);
+
+                // TODO
+                // DTC get/set/etc
+
+                // TODO
+                // CAN comms
+
+                writeln!(board.debug_console, "Operator override");
+            } else {
+                self.throttle_control_state.dtcs = 0;
+
+                if self.throttle_control_state.operator_override {
+                    self.throttle_control_state.operator_override = false;
+                }
+            }
+        }
     }
 }
