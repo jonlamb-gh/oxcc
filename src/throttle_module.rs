@@ -121,12 +121,14 @@ impl ThrottleModule {
                 self.operator_override_state.condition_exceeded_duration(
                     accelerator_position_average >= ACCELERATOR_OVERRIDE_THRESHOLD,
                     FAULT_HYSTERESIS,
+                    board,
                 );
 
             let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
                 self.accelerator_position.high,
                 self.accelerator_position.low,
                 FAULT_HYSTERESIS,
+                board,
             );
 
             // sensor pins tied to ground - a value of zero indicates disconnection

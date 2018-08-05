@@ -52,13 +52,11 @@ fn main() -> ! {
 
     let mut led_state = false;
     loop {
-        // TODO - could fill up a global buffer of sorts and sample them here
-        // instead of making the objects global/atomic
         /*
-        if false {
-            throttle.adc_input(0, 0);
-        }
-        */
+         * TODO - could fill up a global buffer of sorts and sample them here
+         * instead of making the objects global/atomic
+         * throttle.adc_input(high, low);
+         */
 
         throttle.check_for_faults(&mut board);
 

@@ -17,8 +17,8 @@ impl MsTimer {
         }
     }
 
-    // TODO - need to convert ticks to time, use timer.frequency()
+    /// Return elapsed time in milliseconds since instantiation.
     pub fn ms(&self) -> u32 {
-        self.instant.elapsed()
+        self.instant.elapsed() / (self.timer.frequency().0 / 1000)
     }
 }

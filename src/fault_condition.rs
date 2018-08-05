@@ -1,6 +1,8 @@
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.cpp
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.h#L19
 
+use board::Board;
+
 pub struct FaultCondition {
     monitoring_active: bool,
     condition_start_time: u32,
@@ -14,19 +16,55 @@ impl FaultCondition {
         }
     }
 
-    pub fn condition_exceeded_duration(&self, condition_active: bool, max_duration: u32) -> bool {
-        // TODO
-        if true {
-            panic!("TODO");
+    pub fn condition_exceeded_duration(
+        &mut self,
+        condition_active: bool,
+        max_duration: u32,
+        board: &mut Board,
+    ) -> bool {
+        let mut faulted = false;
+
+        if !condition_active {
+            /*
+             * If a fault condition is not active, update the state to clear
+             * the condition active flag and reset the last detection time.
+             */
+            self.monitoring_active = false;
+            self.condition_start_time = 0;
+        } else {
+            let now = board.timer_ms.ms();
+
+            if !self.monitoring_active {
+                /* We just detected a condition that may lead to a fault. Update
+                 * the state to track that the condition is active and store the
+                 * first time of detection.
+                 */
+                self.monitoring_active = true;
+                self.condition_start_time = now;
+            }
+
+            let duration = now - self.condition_start_time;
+
+            if duration >= max_duration {
+                /* The fault condition has been active for longer than the maximum
+                 * acceptable duration.
+                 */
+                faulted = true;
+            }
         }
-        false
+
+        faulted
     }
 
-    pub fn check_voltage_grounded(&self, high: u16, low: u16, max_duration: u32) -> bool {
-        // TODO
-        if true {
-            panic!("TODO");
-        }
-        false
+    pub fn check_voltage_grounded(
+        &mut self,
+        high: u16,
+        low: u16,
+        max_duration: u32,
+        board: &mut Board,
+    ) -> bool {
+        let condition_active = (high == 0) || (low == 0);
+
+        self.condition_exceeded_duration(condition_active, max_duration, board)
     }
 }
