@@ -4,10 +4,12 @@
 
 use board::Board;
 use core::fmt::Write;
+use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
 use nucleo_f767zi::can::CanFrame;
+use nucleo_f767zi::can::{DataFrame, ID};
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use throttle_can_protocol::*;
@@ -37,7 +39,7 @@ pub struct ThrottleModule {
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
     throttle_report: OsccThrottleReport,
-    fault_report: OsccFaultReport,
+    fault_report_frame: OsccFaultReportFrame,
 }
 
 impl ThrottleModule {
@@ -48,7 +50,7 @@ impl ThrottleModule {
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
             throttle_report: OsccThrottleReport::new(),
-            fault_report: OsccFaultReport::new(),
+            fault_report_frame: OsccFaultReportFrame::new(),
         }
     }
 
@@ -126,13 +128,9 @@ impl ThrottleModule {
             if inputs_grounded {
                 self.disable_control(board);
 
-                // TODO
-                // DTC get/set/etc
-                /*
-                 DTC_SET(
-                    g_throttle_control_state.dtcs,
-                    OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL );
-                */
+                self.throttle_control_state
+                    .dtcs
+                    .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
 
                 self.publish_fault_report(board);
 
@@ -143,13 +141,9 @@ impl ThrottleModule {
             } else if operator_overridden {
                 self.disable_control(board);
 
-                // TODO
-                // DTC get/set/etc
-                /*
-                DTC_SET(
-                    g_throttle_control_state.dtcs,
-                    OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE );
-                */
+                self.throttle_control_state
+                    .dtcs
+                    .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
                 self.publish_fault_report(board);
 
@@ -173,19 +167,86 @@ impl ThrottleModule {
     }
 
     pub fn publish_fault_report(&mut self, board: &mut Board) {
-        self.fault_report.fault_origin_id = FAULT_ORIGIN_THROTTLE;
-        self.fault_report.dtcs = self.throttle_control_state.dtcs;
+        self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_THROTTLE;
+        self.fault_report_frame.fault_report.dtcs = self.throttle_control_state.dtcs;
 
-        self.fault_report.transmit(&mut board.control_can);
+        self.fault_report_frame.transmit(&mut board.control_can);
     }
 
     pub fn check_for_incoming_message(&mut self, board: &mut Board) {
         if let Ok(rx_frame) = board.control_can.receive() {
-            self.process_rx_frame(&rx_frame);
+            self.process_rx_frame(&rx_frame, board);
         }
     }
 
-    pub fn process_rx_frame(&mut self, frame: &CanFrame) {
-        // TODO - need the CAN spec
+    pub fn process_rx_frame(&mut self, frame: &CanFrame, board: &mut Board) {
+        let id: u32 = frame.id().into();
+
+        if id == OSCC_THROTTLE_ENABLE_CAN_ID as _ {
+            self.enable_control(board);
+        } else if id == OSCC_THROTTLE_DISABLE_CAN_ID as _ {
+            self.disable_control(board);
+        } else if id == OSCC_THROTTLE_COMMAND_CAN_ID as _ {
+            // TODO - error handling
+            match frame {
+                CanFrame::DataFrame(ref f) => {
+                    self.process_throttle_command(&OsccThrottleCommand::from(f), board)
+                }
+                _ => panic!("Invalid CAN frame"),
+            }
+        } else if id == OSCC_FAULT_REPORT_CAN_ID as _ {
+            // TODO - error handling
+            match frame {
+                CanFrame::DataFrame(ref f) => {
+                    self.process_fault_report(&OsccFaultReport::from(f), board)
+                }
+                _ => panic!("Invalid CAN frame"),
+            }
+        }
+    }
+
+    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, board: &mut Board) {
+        self.disable_control(board);
+
+        writeln!(
+            board.debug_console,
+            "Fault report received from: {} DTCs: {}",
+            fault_report.fault_origin_id, fault_report.dtcs
+        );
+    }
+
+    fn process_throttle_command(&mut self, command: &OsccThrottleCommand, board: &mut Board) {
+        let clamped_position = num::clamp(
+            command.torque_request,
+            MINIMUM_THROTTLE_COMMAND,
+            MAXIMUM_THROTTLE_COMMAND,
+        );
+
+        let spoof_voltage_low: f32 = num::clamp(
+            self.throttle_position_to_volts_low(clamped_position),
+            THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN,
+            THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX,
+        );
+
+        let spoof_voltage_high: f32 = num::clamp(
+            self.throttle_position_to_volts_high(clamped_position),
+            THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN,
+            THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX,
+        );
+
+        let spoof_value_low = (STEPS_PER_VOLT * spoof_voltage_low) as u16;
+        let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
+
+        self.update_throttle(spoof_value_high, spoof_value_low, board);
+    }
+
+    fn throttle_position_to_volts_low(&self, pos: f32) -> f32 {
+        pos * (THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX - THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN)
+            + THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN
+    }
+
+    fn throttle_position_to_volts_high(&self, pos: f32) -> f32 {
+        pos * (THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX - THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN)
+            + THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
     }
 }

@@ -14,6 +14,7 @@ extern crate panic_semihosting;
 
 mod board;
 mod dac_mcp49xx;
+mod dtc;
 mod dual_signal;
 mod fault_condition;
 mod ms_timer;

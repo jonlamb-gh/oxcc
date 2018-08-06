@@ -14,12 +14,33 @@ pub const OSCC_THROTTLE_REPORT_CAN_ID: u16 = 0x93;
 
 pub const OSCC_THROTTLE_REPORT_CAN_DLC: u8 = 8;
 
+// TODO - enum
+pub const OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL: u8 = 0;
+pub const OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE: u8 = 1;
+pub const OSCC_THROTTLE_DTC_COUNT: u8 = 2;
+
 pub struct OsccThrottleEnable {}
 
 pub struct OsccThrottleDisable {}
 
 pub struct OsccThrottleCommand {
-    torque_request: f32,
+    pub torque_request: f32,
+}
+
+impl<'a> From<&'a DataFrame> for OsccThrottleCommand {
+    fn from(f: &DataFrame) -> Self {
+        assert_eq!(u32::from(f.id()), OSCC_THROTTLE_COMMAND_CAN_ID as u32);
+        let data = f.data();
+
+        let raw_torque_request: u32 = data[2] as u32
+            | (data[3] << 8) as u32
+            | (data[4] << 16) as u32
+            | (data[5] << 24) as u32;
+
+        OsccThrottleCommand {
+            torque_request: raw_torque_request as f32,
+        }
+    }
 }
 
 pub struct OsccThrottleReport {
