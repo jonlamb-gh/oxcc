@@ -59,6 +59,7 @@ fn main() -> ! {
 
     throttle.init_devices(&mut board);
 
+    // TODO - impl for gpio::ToggleableOutputPin in BSP crate to get toggle()
     let mut led_state = false;
     loop {
         /*
@@ -68,14 +69,6 @@ fn main() -> ! {
          */
 
         throttle.check_for_faults(&mut board);
-
-        /*
-        writeln!(
-            board.debug_console,
-            "Message on the debug console time_ms = {}",
-            board.timer_ms.ms()
-        );
-        */
 
         // TODO - just polling the publish timer for now
         // we can also drive this logic from the interrupt
@@ -90,9 +83,6 @@ fn main() -> ! {
 
             throttle.publish_throttle_report(&mut board);
         }
-
-        // 1 second
-        //board.delay.delay_ms(1_000_u16);
     }
 }
 
@@ -115,18 +105,15 @@ exception!(HardFault, hard_fault);
 // TODO - any safety related things we can do in these contexts (disable
 // controls, LEDs, etc)?
 fn hard_fault(ef: &ExceptionFrame) -> ! {
-    /*
-    cortex_m::interrupt::free(|cs| {
-        unsafe {
-            let peripherals = stm32f7x7::Peripherals::steal();
-            let mut rcc = peripherals.RCC.constrain();
-            let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
+    cortex_m::interrupt::free(|cs| unsafe {
+        let peripherals = stm32f7x7::Peripherals::steal();
+        let mut rcc = peripherals.RCC.constrain();
+        let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
 
-            let mut leds = led::Leds::new(gpiob);
-            leds[led::Color::Red].on();
-        }
+        let mut leds = led::Leds::new(gpiob);
+        leds[led::Color::Red].on();
     });
-    */
+
     panic!("HardFault at {:#?}", ef);
 }
 
