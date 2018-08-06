@@ -54,6 +54,11 @@ impl ThrottleModule {
         }
     }
 
+    pub fn init_devices(&self, board: &mut Board) {
+        board.throttle_spoof_enable.set_low();
+        // TODO - PIN_DAC_CHIP_SELECT, HIGH
+    }
+
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.throttle_control_state.enabled {
             board

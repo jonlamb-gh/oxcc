@@ -19,10 +19,6 @@ pub const OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL: u8 = 0;
 pub const OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE: u8 = 1;
 pub const OSCC_THROTTLE_DTC_COUNT: u8 = 2;
 
-pub struct OsccThrottleEnable {}
-
-pub struct OsccThrottleDisable {}
-
 pub struct OsccThrottleCommand {
     pub torque_request: f32,
 }
@@ -63,7 +59,10 @@ impl OsccThrottleReport {
     // TODO - error handling
     pub fn transmit(&mut self, can: &mut ControlCan) {
         self.update_can_frame();
-        can.transmit(&self.can_frame.into()).unwrap();
+
+        if let Err(_) = can.transmit(&self.can_frame.into()) {
+            // TODO
+        }
     }
 
     fn update_can_frame(&mut self) {

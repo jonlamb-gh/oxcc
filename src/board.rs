@@ -11,6 +11,8 @@ use nucleo_f767zi::hal::gpio::{Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
+use nucleo_f767zi::hal::stm32f7x7::TIM2;
+use nucleo_f767zi::hal::timer::Timer;
 use nucleo_f767zi::led::Leds;
 use sh::hio;
 
@@ -19,12 +21,17 @@ use sh::hio;
 // - println! -> Serial3 console (currently debug_console)
 // - debug_println! -> ITM/semihosting link
 
+pub type ControlCan = Can1;
+pub type ObdCan = Can2;
+
 type ThrottleSpoofEnable = PD10<Output<PushPull>>;
 //type AcceleratorPositionSensorHigh
 //type AcceleratorPositionSensorLow
+// PIN_DAC_CHIP_SELECT, etc
 
-pub type ControlCan = Can1;
-pub type ObdCan = Can2;
+type CanPublishTimer = Timer<TIM2>;
+
+pub const CAN_PUBLISH_HZ: u32 = 50;
 
 pub struct Board {
     pub semihost_console: hio::HStdout,
@@ -32,6 +39,7 @@ pub struct Board {
     pub leds: Leds,
     pub delay: Delay,
     pub timer_ms: MsTimer,
+    pub can_publish_timer: CanPublishTimer,
     pub dac: Mcp49xx,
     pub control_can: ControlCan,
     pub obd_can: ObdCan,
@@ -100,6 +108,12 @@ impl Board {
             leds,
             delay: Delay::new(core_peripherals.SYST, clocks),
             timer_ms: MsTimer::new(core_peripherals.DWT, clocks),
+            can_publish_timer: CanPublishTimer::tim2(
+                peripherals.TIM2,
+                CAN_PUBLISH_HZ.hz(),
+                clocks,
+                &mut rcc.apb1,
+            ),
             dac: Mcp49xx::new(),
             control_can: Can1::new(),
             obd_can: Can2::new(),
