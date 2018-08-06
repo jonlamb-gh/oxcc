@@ -2,6 +2,7 @@
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.h#L19
 
 use board::Board;
+use dual_signal::DualSignal;
 
 pub struct FaultCondition {
     monitoring_active: bool,
@@ -58,12 +59,11 @@ impl FaultCondition {
 
     pub fn check_voltage_grounded(
         &mut self,
-        high: u16,
-        low: u16,
+        signal: &DualSignal,
         max_duration: u32,
         board: &mut Board,
     ) -> bool {
-        let condition_active = (high == 0) || (low == 0);
+        let condition_active = (signal.high() == 0) || (signal.low() == 0);
 
         self.condition_exceeded_duration(condition_active, max_duration, board)
     }

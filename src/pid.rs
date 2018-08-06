@@ -43,7 +43,7 @@ impl Pid {
         let curr_error = setpoint - input;
 
         // integration with windup guarding
-        self.int_error += (curr_error * dt);
+        self.int_error += curr_error * dt;
 
         if self.int_error < -self.windup_guard {
             self.int_error = -self.windup_guard;
@@ -52,12 +52,12 @@ impl Pid {
         }
 
         // differentiation
-        let diff = ((input - self.prev_input) / dt);
+        let diff = (input - self.prev_input) / dt;
 
         // scaling
-        let p_term = (self.proportional_gain * curr_error);
-        let i_term = (self.integral_gain * self.int_error);
-        let d_term = (self.derivative_gain * diff);
+        let p_term = self.proportional_gain * curr_error;
+        let i_term = self.integral_gain * self.int_error;
+        let d_term = self.derivative_gain * diff;
 
         // summation of terms
         self.control = p_term + i_term - d_term;

@@ -64,8 +64,9 @@ impl Board {
         //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut
         // flash.acr);
 
-        // TODO - should be some safe high level API
+        // TODO - use the safe APIs once this block solidifies
         unsafe {
+            // TODO - move this constant into BSP crate?
             // unlock registers to enable DWT cycle counter for MsTimer
             core_peripherals.DWT.lar.write(0xC5ACCE55);
         }

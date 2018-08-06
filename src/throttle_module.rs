@@ -4,6 +4,7 @@
 
 use board::Board;
 use core::fmt::Write;
+use dual_signal::DualSignal;
 use fault_condition::FaultCondition;
 use nucleo_f767zi::hal::prelude::*;
 use num;
@@ -11,6 +12,7 @@ use num;
 // TODO feature gate vehicles
 use kial_soul_ev::*;
 
+/*
 struct AcceleratorPosition {
     low: u16,
     high: u16,
@@ -21,6 +23,7 @@ impl AcceleratorPosition {
         AcceleratorPosition { low: 0, high: 0 }
     }
 }
+*/
 
 struct ThrottleControlState {
     enabled: bool,
@@ -39,7 +42,7 @@ impl ThrottleControlState {
 }
 
 pub struct ThrottleModule {
-    accelerator_position: AcceleratorPosition,
+    accelerator_position: DualSignal,
     throttle_control_state: ThrottleControlState,
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
@@ -48,7 +51,7 @@ pub struct ThrottleModule {
 impl ThrottleModule {
     pub const fn new() -> Self {
         ThrottleModule {
-            accelerator_position: AcceleratorPosition::new(),
+            accelerator_position: DualSignal::new(0, 0),
             throttle_control_state: ThrottleControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
@@ -57,11 +60,9 @@ impl ThrottleModule {
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.throttle_control_state.enabled {
-            // TODO - revist this
-            board.dac.prevent_signal_discontinuity(
-                self.accelerator_position.low,
-                self.accelerator_position.high,
-            );
+            board
+                .dac
+                .prevent_signal_discontinuity(&self.accelerator_position);
 
             board.throttle_spoof_enable.set_low();
             self.throttle_control_state.enabled = false;
@@ -71,11 +72,9 @@ impl ThrottleModule {
 
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.throttle_control_state.enabled && !self.throttle_control_state.operator_override {
-            // TODO - revist this
-            board.dac.prevent_signal_discontinuity(
-                self.accelerator_position.low,
-                self.accelerator_position.high,
-            );
+            board
+                .dac
+                .prevent_signal_discontinuity(&self.accelerator_position);
 
             board.throttle_spoof_enable.set_high();
             self.throttle_control_state.enabled = true;
@@ -102,20 +101,19 @@ impl ThrottleModule {
                 THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MAX,
             );
 
+            // TODO - revisit this, enforce high->A, low->B
             board.dac.set_outputs(spoof_high, spoof_low);
         }
     }
 
     // Normally via an interrupt handler.
     pub fn adc_input(&mut self, high: u16, low: u16) {
-        self.accelerator_position.high = high;
-        self.accelerator_position.low = low;
+        self.accelerator_position.update(high, low);
     }
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
         if self.throttle_control_state.enabled && self.throttle_control_state.dtcs > 0 {
-            let accelerator_position_average: u32 =
-                (self.accelerator_position.low as u32 + self.accelerator_position.high as u32) / 2;
+            let accelerator_position_average = self.accelerator_position.average();
 
             let operator_overridden: bool =
                 self.operator_override_state.condition_exceeded_duration(
@@ -125,8 +123,7 @@ impl ThrottleModule {
                 );
 
             let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
-                self.accelerator_position.high,
-                self.accelerator_position.low,
+                &self.accelerator_position,
                 FAULT_HYSTERESIS,
                 board,
             );
