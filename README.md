@@ -15,6 +15,20 @@ rustup target add thumbv7em-none-eabihf
 cargo build
 ```
 
+## Deploying
+
+```bash
+./scripts/deploy
+
+# or manually
+arm-none-eabi-objcopy \
+    -O ihex \
+    target/thumbv7em-none-eabihf/debug/oxcc \
+    target/thumbv7em-none-eabihf/debug/oxcc.hex
+
+st-flash --format ihex write target/thumbv7em-none-eabihf/debug/oxcc.hex
+```
+
 ## Debugging
 
 ```bash
