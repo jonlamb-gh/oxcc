@@ -20,6 +20,12 @@ mod ms_timer;
 mod pid;
 mod throttle_module;
 
+#[path = "can_protocols/fault_can_protocol.rs"]
+mod fault_can_protocol;
+#[path = "can_protocols/oscc_magic_byte.rs"]
+mod oscc_magic_byte;
+#[path = "can_protocols/throttle_can_protocol.rs"]
+mod throttle_can_protocol;
 // TODO - feature gate this as vehicle
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;
@@ -36,10 +42,9 @@ use rt::ExceptionFrame;
 use throttle_module::ThrottleModule;
 
 // Interrupt safe access
-/*
-static THROTTLE_MODULE: Mutex<RefCell<throttle_module::ThrottleModule>> =
-    Mutex::new(RefCell::new(throttle_module::ThrottleModule::new()));
-*/
+// Requires const fn's
+//static THROTTLE_MODULE: Mutex<RefCell<throttle_module::ThrottleModule>> =
+//    Mutex::new(RefCell::new(throttle_module::ThrottleModule::new()));
 
 entry!(main);
 

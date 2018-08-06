@@ -5,25 +5,15 @@
 use board::Board;
 use core::fmt::Write;
 use dual_signal::DualSignal;
+use fault_can_protocol::*;
 use fault_condition::FaultCondition;
+use nucleo_f767zi::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
+use throttle_can_protocol::*;
 
 // TODO feature gate vehicles
 use kial_soul_ev::*;
-
-/*
-struct AcceleratorPosition {
-    low: u16,
-    high: u16,
-}
-
-impl AcceleratorPosition {
-    pub const fn new() -> Self {
-        AcceleratorPosition { low: 0, high: 0 }
-    }
-}
-*/
 
 struct ThrottleControlState {
     enabled: bool,
@@ -46,15 +36,19 @@ pub struct ThrottleModule {
     throttle_control_state: ThrottleControlState,
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
+    throttle_report: OsccThrottleReport,
+    fault_report: OsccFaultReport,
 }
 
 impl ThrottleModule {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         ThrottleModule {
             accelerator_position: DualSignal::new(0, 0),
             throttle_control_state: ThrottleControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
+            throttle_report: OsccThrottleReport::new(),
+            fault_report: OsccFaultReport::new(),
         }
     }
 
@@ -134,9 +128,13 @@ impl ThrottleModule {
 
                 // TODO
                 // DTC get/set/etc
+                /*
+                 DTC_SET(
+                    g_throttle_control_state.dtcs,
+                    OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL );
+                */
 
-                // TODO
-                // CAN comms
+                self.publish_fault_report(board);
 
                 writeln!(
                     board.debug_console,
@@ -147,9 +145,13 @@ impl ThrottleModule {
 
                 // TODO
                 // DTC get/set/etc
+                /*
+                DTC_SET(
+                    g_throttle_control_state.dtcs,
+                    OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE );
+                */
 
-                // TODO
-                // CAN comms
+                self.publish_fault_report(board);
 
                 writeln!(board.debug_console, "Operator override");
             } else {
@@ -160,5 +162,30 @@ impl ThrottleModule {
                 }
             }
         }
+    }
+
+    pub fn publish_throttle_report(&mut self, board: &mut Board) {
+        self.throttle_report.enabled = self.throttle_control_state.enabled;
+        self.throttle_report.operator_override = self.throttle_control_state.operator_override;
+        self.throttle_report.dtcs = self.throttle_control_state.dtcs;
+
+        self.throttle_report.transmit(&mut board.control_can);
+    }
+
+    pub fn publish_fault_report(&mut self, board: &mut Board) {
+        self.fault_report.fault_origin_id = FAULT_ORIGIN_THROTTLE;
+        self.fault_report.dtcs = self.throttle_control_state.dtcs;
+
+        self.fault_report.transmit(&mut board.control_can);
+    }
+
+    pub fn check_for_incoming_message(&mut self, board: &mut Board) {
+        if let Ok(rx_frame) = board.control_can.receive() {
+            self.process_rx_frame(&rx_frame);
+        }
+    }
+
+    pub fn process_rx_frame(&mut self, frame: &CanFrame) {
+        // TODO - need the CAN spec
     }
 }

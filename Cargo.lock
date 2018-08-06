@@ -56,6 +56,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded_types"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "nb"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -63,10 +68,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "nucleo-f767zi"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#54705cc217c632d2816f96530543cdb0ddf1857f"
+source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#83c20d00070bbeb73a23ca399b93824de90c38a3"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embedded_types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "stm32f767-hal 0.0.1 (git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel)",
 ]
@@ -200,6 +206,7 @@ dependencies = [
 "checksum cortex-m-rt 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "6d5c26952ec2bdfd3c66cddb22cb6432b042ca9ccda55762ebba68b73adbae5a"
 "checksum cortex-m-semihosting 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0b3d0df96d537c4f66dd9f4d1da21d83f9a5917990196925b3603be85e46071e"
 "checksum embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "26944677e4934eb5fb4025501dc0d6cdbcf6bfabd6200fcfee2e7e8eef8c0362"
+"checksum embedded_types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ea8dc5db8dae723ecf68d863ff0011500e29fbbede193fa8fb3ca032595d3f6a"
 "checksum nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "69f380b5fe9fab8c0d7a6a99cda23e2cc0463bedb2cbc3aada0813b98496ecdc"
 "checksum nucleo-f767zi 0.0.1 (git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel)" = "<none>"
 "checksum num 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cf4825417e1e1406b3782a8ce92f4d53f26ec055e3622e1881ca8e9f5f9e08db"

@@ -1,9 +1,8 @@
-// TODO - copy defs from OSCC
-
 use core::fmt::Write;
 use cortex_m;
 use dac_mcp49xx::Mcp49xx;
 use ms_timer::MsTimer;
+use nucleo_f767zi::can::{Can1, Can2};
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::flash::FlashExt;
@@ -24,6 +23,9 @@ type ThrottleSpoofEnable = PD10<Output<PushPull>>;
 //type AcceleratorPositionSensorHigh
 //type AcceleratorPositionSensorLow
 
+pub type ControlCan = Can1;
+pub type ObdCan = Can2;
+
 pub struct Board {
     pub semihost_console: hio::HStdout,
     pub debug_console: DebugConsole,
@@ -31,6 +33,8 @@ pub struct Board {
     pub delay: Delay,
     pub timer_ms: MsTimer,
     pub dac: Mcp49xx,
+    pub control_can: ControlCan,
+    pub obd_can: ObdCan,
     pub throttle_spoof_enable: ThrottleSpoofEnable,
 }
 
@@ -97,6 +101,8 @@ impl Board {
             delay: Delay::new(core_peripherals.SYST, clocks),
             timer_ms: MsTimer::new(core_peripherals.DWT, clocks),
             dac: Mcp49xx::new(),
+            control_can: Can1::new(),
+            obd_can: Can2::new(),
             throttle_spoof_enable,
         }
     }
