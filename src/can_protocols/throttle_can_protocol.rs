@@ -1,15 +1,10 @@
 use board::ControlCan;
-use nucleo_f767zi::can::{BaseID, CanFrame, DataFrame, ID};
+use nucleo_f767zi::can::{BaseID, DataFrame, ID};
 use oscc_magic_byte::*;
 
-pub const OSCC_THROTTLE_CAN_ID_INDEX: u16 = 0x90;
-
 pub const OSCC_THROTTLE_ENABLE_CAN_ID: u16 = 0x90;
-
 pub const OSCC_THROTTLE_DISABLE_CAN_ID: u16 = 0x91;
-
 pub const OSCC_THROTTLE_COMMAND_CAN_ID: u16 = 0x92;
-
 pub const OSCC_THROTTLE_REPORT_CAN_ID: u16 = 0x93;
 
 pub const OSCC_THROTTLE_REPORT_CAN_DLC: u8 = 8;
@@ -17,7 +12,6 @@ pub const OSCC_THROTTLE_REPORT_CAN_DLC: u8 = 8;
 // TODO - enum
 pub const OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL: u8 = 0;
 pub const OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE: u8 = 1;
-pub const OSCC_THROTTLE_DTC_COUNT: u8 = 2;
 
 pub struct OsccThrottleCommand {
     pub torque_request: f32,
@@ -29,9 +23,9 @@ impl<'a> From<&'a DataFrame> for OsccThrottleCommand {
         let data = f.data();
 
         let raw_torque_request: u32 = data[2] as u32
-            | (data[3] << 8) as u32
-            | (data[4] << 16) as u32
-            | (data[5] << 24) as u32;
+            | ((data[3] as u32) << 8)
+            | ((data[4] as u32) << 16)
+            | ((data[5] as u32) << 24);
 
         OsccThrottleCommand {
             torque_request: raw_torque_request as f32,
@@ -69,7 +63,7 @@ impl OsccThrottleReport {
         self.can_frame
             .set_data_length(OSCC_THROTTLE_REPORT_CAN_DLC as _);
 
-        let mut data = self.can_frame.data_as_mut();
+        let data = self.can_frame.data_as_mut();
 
         data[0] = OSCC_MAGIC_BYTE_0;
         data[1] = OSCC_MAGIC_BYTE_1;

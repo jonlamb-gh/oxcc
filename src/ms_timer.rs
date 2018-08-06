@@ -8,7 +8,7 @@ pub struct MsTimer {
 }
 
 impl MsTimer {
-    pub fn new(mut dwt: DWT, clocks: Clocks) -> Self {
+    pub fn new(dwt: DWT, clocks: Clocks) -> Self {
         let timer = MonoTimer::new(dwt, clocks);
 
         MsTimer {

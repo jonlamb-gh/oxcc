@@ -32,10 +32,6 @@ mod throttle_can_protocol;
 mod kial_soul_ev;
 
 use board::Board;
-use core::cell::RefCell;
-use core::fmt::Write;
-use cortex_m::interrupt::Mutex;
-use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
@@ -44,6 +40,8 @@ use throttle_module::ThrottleModule;
 
 // Interrupt safe access
 // Requires const fn's
+//use core::cell::RefCell;
+//use cortex_m::interrupt::Mutex;
 //static THROTTLE_MODULE: Mutex<RefCell<throttle_module::ThrottleModule>> =
 //    Mutex::new(RefCell::new(throttle_module::ThrottleModule::new()));
 
@@ -67,6 +65,11 @@ fn main() -> ! {
          * instead of making the objects global/atomic
          * throttle.adc_input(high, low);
          */
+        if false {
+            throttle.adc_input(0, 0);
+        }
+
+        throttle.check_for_incoming_message(&mut board);
 
         throttle.check_for_faults(&mut board);
 
@@ -105,7 +108,7 @@ exception!(HardFault, hard_fault);
 // TODO - any safety related things we can do in these contexts (disable
 // controls, LEDs, etc)?
 fn hard_fault(ef: &ExceptionFrame) -> ! {
-    cortex_m::interrupt::free(|cs| unsafe {
+    cortex_m::interrupt::free(|_cs| unsafe {
         let peripherals = stm32f7x7::Peripherals::steal();
         let mut rcc = peripherals.RCC.constrain();
         let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);

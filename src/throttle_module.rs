@@ -9,7 +9,6 @@ use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
 use nucleo_f767zi::can::CanFrame;
-use nucleo_f767zi::can::{DataFrame, ID};
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use throttle_can_protocol::*;

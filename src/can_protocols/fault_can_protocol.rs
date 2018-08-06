@@ -1,8 +1,6 @@
 use board::ControlCan;
-use nucleo_f767zi::can::{BaseID, CanFrame, DataFrame, ID};
+use nucleo_f767zi::can::{BaseID, DataFrame, ID};
 use oscc_magic_byte::*;
-
-pub const OSCC_FAULT_CAN_ID_INDEX: u16 = 0xA0;
 
 pub const OSCC_FAULT_REPORT_CAN_ID: u16 = 0xAF;
 
@@ -40,9 +38,9 @@ impl<'a> From<&'a DataFrame> for OsccFaultReport {
         let data = f.data();
 
         let fault_origin_id: u32 = data[2] as u32
-            | (data[3] << 8) as u32
-            | (data[4] << 16) as u32
-            | (data[5] << 24) as u32;
+            | ((data[3] as u32) << 8)
+            | ((data[4] as u32) << 16)
+            | ((data[5] as u32) << 24);
 
         OsccFaultReport {
             fault_origin_id,
@@ -69,7 +67,7 @@ impl OsccFaultReportFrame {
         self.can_frame
             .set_data_length(OSCC_FAULT_REPORT_CAN_DLC as _);
 
-        let mut data = self.can_frame.data_as_mut();
+        let data = self.can_frame.data_as_mut();
 
         data[0] = OSCC_MAGIC_BYTE_0;
         data[1] = OSCC_MAGIC_BYTE_1;

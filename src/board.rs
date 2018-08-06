@@ -5,7 +5,6 @@ use ms_timer::MsTimer;
 use nucleo_f767zi::can::{Can1, Can2};
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::delay::Delay;
-use nucleo_f767zi::hal::flash::FlashExt;
 use nucleo_f767zi::hal::gpio::gpiod::PD10;
 use nucleo_f767zi::hal::gpio::{Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
