@@ -12,6 +12,7 @@ extern crate nucleo_f767zi;
 extern crate num;
 extern crate panic_semihosting;
 
+mod adc_storage;
 mod board;
 mod can_gateway_module;
 mod dac_mcp49xx;
@@ -41,9 +42,13 @@ mod throttle_can_protocol;
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;
 
+use adc_storage::Signal;
 use board::Board;
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
+use core::cell::RefCell;
+use core::fmt::Write;
+use cortex_m::interrupt::Mutex;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
@@ -51,12 +56,11 @@ use rt::ExceptionFrame;
 use steering_module::SteeringModule;
 use throttle_module::ThrottleModule;
 
-// Interrupt safe access
-// Requires const fn's
-//use core::cell::RefCell;
-//use cortex_m::interrupt::Mutex;
-//static THROTTLE_MODULE: Mutex<RefCell<throttle_module::ThrottleModule>> =
-//    Mutex::new(RefCell::new(throttle_module::ThrottleModule::new()));
+// Global storage for the ADC samples, with interrupt safe access.
+// Filled by the ADC interrupt handler.
+// Consumed by the modules in the main loop.
+static ADC_STORAGE: Mutex<RefCell<adc_storage::AdcStorage>> =
+    Mutex::new(RefCell::new(adc_storage::AdcStorage::new()));
 
 entry!(main);
 
@@ -66,6 +70,7 @@ fn main() -> ! {
     let mut board = Board::new();
 
     // TODO - just for testing
+    writeln!(board.debug_console, "oxcc is running");
     board.leds[led::Color::Blue].on();
 
     let mut brake = BrakeModule::new();
@@ -81,16 +86,25 @@ fn main() -> ! {
     // TODO - impl for gpio::ToggleableOutputPin in BSP crate to get toggle()
     let mut led_state = false;
     loop {
-        /*
-         * TODO - could fill up a global buffer of sorts and sample them here
-         * instead of making the objects global/atomic
-         * throttle.adc_input(high, low);
-         */
-        if false {
-            brake.adc_input(0, 0);
-            throttle.adc_input(0, 0);
-            steering.adc_input(0, 0);
-        }
+        // interrupt handler continously updates the ADC samples
+        cortex_m::interrupt::free(|cs| {
+            let adc_storage = ADC_STORAGE.borrow(cs).borrow();
+
+            brake.adc_input(
+                adc_storage[Signal::BrakePedalPositionSensorHigh],
+                adc_storage[Signal::BrakePedalPositionSensorLow],
+            );
+
+            throttle.adc_input(
+                adc_storage[Signal::AcceleratorPositionSensorHigh],
+                adc_storage[Signal::AcceleratorPositionSensorLow],
+            );
+
+            steering.adc_input(
+                adc_storage[Signal::TorqueSensorHigh],
+                adc_storage[Signal::TorqueSensorLow],
+            );
+        });
 
         brake.check_for_incoming_message(&mut board);
         throttle.check_for_incoming_message(&mut board);
@@ -126,12 +140,11 @@ interrupt!(ADC, adc_isr);
 // TODO might have to use unsafe style like here in RCC
 // https://github.com/jonlamb-gh/stm32f767-hal/blob/devel/src/rcc.rs#L262
 fn adc_isr() {
-    /*
     cortex_m::interrupt::free(|cs| {
-        let p = stm32f7x7::Peripherals::take();
-        THROTTLE_MODULE.adc_input(...);
+        let _adc_storage = ADC_STORAGE.borrow(cs).borrow_mut();
+
+        // TODO
     });
-    */
 }
 
 exception!(HardFault, hard_fault);
@@ -154,5 +167,14 @@ fn hard_fault(ef: &ExceptionFrame) -> ! {
 exception!(*, default_handler);
 
 fn default_handler(irqn: i16) {
+    cortex_m::interrupt::free(|_cs| unsafe {
+        let peripherals = stm32f7x7::Peripherals::steal();
+        let mut rcc = peripherals.RCC.constrain();
+        let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
+
+        let mut leds = led::Leds::new(gpiob);
+        leds[led::Color::Red].on();
+    });
+
     panic!("Unhandled exception (IRQn = {})", irqn);
 }

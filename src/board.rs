@@ -26,12 +26,15 @@ pub type ObdCan = Can2;
 type ThrottleSpoofEnable = PD10<Output<PushPull>>;
 //type AcceleratorPositionSensorHigh
 //type AcceleratorPositionSensorLow
-// PIN_DAC_CHIP_SELECT, etc
 
 type SteeringSpoofEnable = PD11<Output<PushPull>>;
+//type TorqueSensorHigh
+//type TorqueSensorLow
 
 type BrakeSpoofEnable = PD12<Output<PushPull>>;
 type BrakeLightEnable = PD13<Output<PushPull>>;
+//type BrakePedalPositionSensorHigh
+//type BrakePedalPositionSensorLow
 
 type CanPublishTimer = Timer<TIM2>;
 
