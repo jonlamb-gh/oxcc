@@ -6,9 +6,10 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
-use nucleo_f767zi::can::CanFrame;
+use nucleo_f767zi::can::{CanFrame, DataFrame};
 use nucleo_f767zi::hal::prelude::*;
 use num;
+use oscc_magic_byte::*;
 use steering_can_protocol::*;
 
 // TODO feature gate vehicles
@@ -39,8 +40,8 @@ pub struct SteeringModule {
     control_state: SteeringControlState,
     grounded_fault_state: FaultCondition,
     filtered_diff: u16,
-    /* throttle_report: OsccThrottleReport, */
-    /* fault_report_frame: OsccFaultReportFrame, */
+    steering_report: OsccSteeringReport,
+    fault_report_frame: OsccFaultReportFrame,
 }
 
 impl SteeringModule {
@@ -50,8 +51,8 @@ impl SteeringModule {
             control_state: SteeringControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             filtered_diff: 0,
-            /* throttle_report: OsccThrottleReport::new(), */
-            /* fault_report_frame: OsccFaultReportFrame::new(), */
+            steering_report: OsccSteeringReport::new(),
+            fault_report_frame: OsccFaultReportFrame::new(),
         }
     }
 
@@ -168,11 +169,91 @@ impl SteeringModule {
         (alpha * input) + ((1.0 - alpha) * average)
     }
 
-    pub fn publish_steering_report(&mut self, board: &mut Board) {}
+    pub fn publish_steering_report(&mut self, board: &mut Board) {
+        self.steering_report.enabled = self.control_state.enabled;
+        self.steering_report.operator_override = self.control_state.operator_override;
+        self.steering_report.dtcs = self.control_state.dtcs;
 
-    pub fn publish_fault_report(&mut self, board: &mut Board) {}
+        self.steering_report.transmit(&mut board.control_can);
+    }
 
-    pub fn check_for_incoming_message(&mut self, board: &mut Board) {}
+    pub fn publish_fault_report(&mut self, board: &mut Board) {
+        self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_STEERING;
+        self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
 
-    pub fn process_rx_frame(&mut self, frame: &CanFrame, board: &mut Board) {}
+        self.fault_report_frame.transmit(&mut board.control_can);
+    }
+
+    // TODO - error handling
+    pub fn check_for_incoming_message(&mut self, board: &mut Board) {
+        if let Ok(rx_frame) = board.control_can.receive() {
+            if let CanFrame::DataFrame(ref f) = rx_frame {
+                self.process_rx_frame(f, board);
+            }
+        }
+    }
+
+    // TODO - error handling
+    pub fn process_rx_frame(&mut self, frame: &DataFrame, board: &mut Board) {
+        let id: u32 = frame.id().into();
+        let data = frame.data();
+
+        assert_eq!(data[0], OSCC_MAGIC_BYTE_0);
+        assert_eq!(data[1], OSCC_MAGIC_BYTE_1);
+
+        if id == OSCC_STEERING_ENABLE_CAN_ID.into() {
+            self.enable_control(board);
+        } else if id == OSCC_STEERING_DISABLE_CAN_ID.into() {
+            self.disable_control(board);
+        } else if id == OSCC_STEERING_COMMAND_CAN_ID.into() {
+            self.process_steering_command(&OsccSteeringCommand::from(frame), board);
+        } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
+            self.process_fault_report(&OsccFaultReport::from(frame), board);
+        }
+    }
+
+    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, board: &mut Board) {
+        self.disable_control(board);
+
+        writeln!(
+            board.debug_console,
+            "Fault report received from: {} DTCs: {}",
+            fault_report.fault_origin_id, fault_report.dtcs
+        );
+    }
+
+    fn process_steering_command(&mut self, command: &OsccSteeringCommand, board: &mut Board) {
+        let clamped_torque = num::clamp(
+            command.torque_request * MAXIMUM_TORQUE_COMMAND,
+            MINIMUM_TORQUE_COMMAND,
+            MAXIMUM_TORQUE_COMMAND,
+        );
+
+        let spoof_voltage_low: f32 = num::clamp(
+            self.steering_torque_to_volts_low(clamped_torque),
+            STEERING_SPOOF_LOW_SIGNAL_VOLTAGE_MIN,
+            STEERING_SPOOF_LOW_SIGNAL_VOLTAGE_MAX,
+        );
+
+        let spoof_voltage_high: f32 = num::clamp(
+            self.steering_torque_to_volts_high(clamped_torque),
+            STEERING_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN,
+            STEERING_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX,
+        );
+
+        let spoof_value_low = (STEPS_PER_VOLT * spoof_voltage_low) as u16;
+        let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
+
+        self.update_steering(spoof_value_high, spoof_value_low, board);
+    }
+
+    fn steering_torque_to_volts_low(&self, torque: f32) -> f32 {
+        (TORQUE_SPOOF_LOW_SIGNAL_CALIBRATION_CURVE_SCALE * torque)
+            + TORQUE_SPOOF_LOW_SIGNAL_CALIBRATION_CURVE_OFFSET
+    }
+
+    fn steering_torque_to_volts_high(&self, torque: f32) -> f32 {
+        (TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_SCALE * torque)
+            + TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_OFFSET
+    }
 }

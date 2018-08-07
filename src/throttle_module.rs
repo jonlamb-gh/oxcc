@@ -8,9 +8,10 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
-use nucleo_f767zi::can::CanFrame;
+use nucleo_f767zi::can::{CanFrame, DataFrame};
 use nucleo_f767zi::hal::prelude::*;
 use num;
+use oscc_magic_byte::*;
 use throttle_can_protocol::*;
 
 // TODO feature gate vehicles
@@ -178,35 +179,31 @@ impl ThrottleModule {
         self.fault_report_frame.transmit(&mut board.control_can);
     }
 
+    // TODO - error handling
     pub fn check_for_incoming_message(&mut self, board: &mut Board) {
         if let Ok(rx_frame) = board.control_can.receive() {
-            self.process_rx_frame(&rx_frame, board);
+            if let CanFrame::DataFrame(ref f) = rx_frame {
+                self.process_rx_frame(f, board);
+            }
         }
     }
 
-    pub fn process_rx_frame(&mut self, frame: &CanFrame, board: &mut Board) {
+    // TODO - error handling
+    pub fn process_rx_frame(&mut self, frame: &DataFrame, board: &mut Board) {
         let id: u32 = frame.id().into();
+        let data = frame.data();
 
-        if id == OSCC_THROTTLE_ENABLE_CAN_ID as _ {
+        assert_eq!(data[0], OSCC_MAGIC_BYTE_0);
+        assert_eq!(data[1], OSCC_MAGIC_BYTE_1);
+
+        if id == OSCC_THROTTLE_ENABLE_CAN_ID.into() {
             self.enable_control(board);
-        } else if id == OSCC_THROTTLE_DISABLE_CAN_ID as _ {
+        } else if id == OSCC_THROTTLE_DISABLE_CAN_ID.into() {
             self.disable_control(board);
-        } else if id == OSCC_THROTTLE_COMMAND_CAN_ID as _ {
-            // TODO - error handling
-            match frame {
-                CanFrame::DataFrame(ref f) => {
-                    self.process_throttle_command(&OsccThrottleCommand::from(f), board)
-                }
-                _ => panic!("Invalid CAN frame"),
-            }
-        } else if id == OSCC_FAULT_REPORT_CAN_ID as _ {
-            // TODO - error handling
-            match frame {
-                CanFrame::DataFrame(ref f) => {
-                    self.process_fault_report(&OsccFaultReport::from(f), board)
-                }
-                _ => panic!("Invalid CAN frame"),
-            }
+        } else if id == OSCC_THROTTLE_COMMAND_CAN_ID.into() {
+            self.process_throttle_command(&OsccThrottleCommand::from(frame), board);
+        } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
+            self.process_fault_report(&OsccFaultReport::from(frame), board);
         }
     }
 
