@@ -37,7 +37,7 @@ impl ThrottleControlState {
 
 pub struct ThrottleModule {
     accelerator_position: DualSignal,
-    throttle_control_state: ThrottleControlState,
+    control_state: ThrottleControlState,
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
     throttle_report: OsccThrottleReport,
@@ -48,7 +48,7 @@ impl ThrottleModule {
     pub fn new() -> Self {
         ThrottleModule {
             accelerator_position: DualSignal::new(0, 0),
-            throttle_control_state: ThrottleControlState::new(),
+            control_state: ThrottleControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
             throttle_report: OsccThrottleReport::new(),
@@ -62,25 +62,25 @@ impl ThrottleModule {
     }
 
     pub fn disable_control(&mut self, board: &mut Board) {
-        if self.throttle_control_state.enabled {
+        if self.control_state.enabled {
             board
                 .dac
                 .prevent_signal_discontinuity(&self.accelerator_position);
 
             board.throttle_spoof_enable.set_low();
-            self.throttle_control_state.enabled = false;
+            self.control_state.enabled = false;
             writeln!(board.debug_console, "Throttle control disabled");
         }
     }
 
     pub fn enable_control(&mut self, board: &mut Board) {
-        if !self.throttle_control_state.enabled && !self.throttle_control_state.operator_override {
+        if !self.control_state.enabled && !self.control_state.operator_override {
             board
                 .dac
                 .prevent_signal_discontinuity(&self.accelerator_position);
 
             board.throttle_spoof_enable.set_high();
-            self.throttle_control_state.enabled = true;
+            self.control_state.enabled = true;
             writeln!(board.debug_console, "Throttle control enabled");
         }
     }
@@ -91,7 +91,7 @@ impl ThrottleModule {
         spoof_command_low: u16,
         board: &mut Board,
     ) {
-        if self.throttle_control_state.enabled {
+        if self.control_state.enabled {
             let spoof_high = num::clamp(
                 spoof_command_high,
                 THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MIN,
@@ -114,7 +114,7 @@ impl ThrottleModule {
     }
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
-        if self.throttle_control_state.enabled && self.throttle_control_state.dtcs > 0 {
+        if self.control_state.enabled && self.control_state.dtcs > 0 {
             let accelerator_position_average = self.accelerator_position.average();
 
             let operator_overridden: bool =
@@ -134,7 +134,7 @@ impl ThrottleModule {
             if inputs_grounded {
                 self.disable_control(board);
 
-                self.throttle_control_state
+                self.control_state
                     .dtcs
                     .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
 
@@ -147,7 +147,7 @@ impl ThrottleModule {
             } else if operator_overridden {
                 self.disable_control(board);
 
-                self.throttle_control_state
+                self.control_state
                     .dtcs
                     .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
@@ -155,26 +155,26 @@ impl ThrottleModule {
 
                 writeln!(board.debug_console, "Operator override");
             } else {
-                self.throttle_control_state.dtcs = 0;
+                self.control_state.dtcs = 0;
 
-                if self.throttle_control_state.operator_override {
-                    self.throttle_control_state.operator_override = false;
+                if self.control_state.operator_override {
+                    self.control_state.operator_override = false;
                 }
             }
         }
     }
 
     pub fn publish_throttle_report(&mut self, board: &mut Board) {
-        self.throttle_report.enabled = self.throttle_control_state.enabled;
-        self.throttle_report.operator_override = self.throttle_control_state.operator_override;
-        self.throttle_report.dtcs = self.throttle_control_state.dtcs;
+        self.throttle_report.enabled = self.control_state.enabled;
+        self.throttle_report.operator_override = self.control_state.operator_override;
+        self.throttle_report.dtcs = self.control_state.dtcs;
 
         self.throttle_report.transmit(&mut board.control_can);
     }
 
     pub fn publish_fault_report(&mut self, board: &mut Board) {
         self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_THROTTLE;
-        self.fault_report_frame.fault_report.dtcs = self.throttle_control_state.dtcs;
+        self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
 
         self.fault_report_frame.transmit(&mut board.control_can);
     }
