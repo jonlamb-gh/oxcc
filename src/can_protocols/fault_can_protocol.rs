@@ -60,7 +60,10 @@ impl OsccFaultReportFrame {
     // TODO - error handling
     pub fn transmit(&mut self, can: &mut ControlCan) {
         self.update_can_frame();
-        can.transmit(&self.can_frame.into()).unwrap();
+
+        if let Err(_) = can.transmit(&self.can_frame.into()) {
+            // TODO
+        }
     }
 
     fn update_can_frame(&mut self) {

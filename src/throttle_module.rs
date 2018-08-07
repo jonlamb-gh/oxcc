@@ -1,6 +1,4 @@
-// https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/main.cpp
-// https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/include/throttle_control.h
-// https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp
+// https://github.com/jonlamb-gh/oscc/tree/devel/firmware/throttle
 
 use board::Board;
 use core::fmt::Write;

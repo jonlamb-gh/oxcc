@@ -1,4 +1,4 @@
-// https://github.com/jonlamb-gh/oscc/tree/master/firmware/steering
+// https://github.com/jonlamb-gh/oscc/tree/devel/firmware/steering
 
 use board::Board;
 use core::fmt::Write;

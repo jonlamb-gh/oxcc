@@ -13,6 +13,7 @@ extern crate num;
 extern crate panic_semihosting;
 
 mod board;
+mod can_gateway_module;
 mod dac_mcp49xx;
 mod dtc;
 mod dual_signal;
@@ -43,6 +44,7 @@ mod kial_soul_ev;
 
 use board::Board;
 use brake_module::BrakeModule;
+use can_gateway_module::CanGatewayModule;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
@@ -70,10 +72,12 @@ fn main() -> ! {
     let mut brake = BrakeModule::new();
     let mut throttle = ThrottleModule::new();
     let mut steering = SteeringModule::new();
+    let mut can_gateway = CanGatewayModule::new();
 
     brake.init_devices(&mut board);
     throttle.init_devices(&mut board);
     steering.init_devices(&mut board);
+    can_gateway.init_devices(&mut board);
 
     // TODO - impl for gpio::ToggleableOutputPin in BSP crate to get toggle()
     let mut led_state = false;
@@ -96,6 +100,8 @@ fn main() -> ! {
         brake.check_for_faults(&mut board);
         throttle.check_for_faults(&mut board);
         steering.check_for_faults(&mut board);
+
+        can_gateway.republish_obd_frames_to_control_can_bus(&mut board);
 
         // TODO - just polling the publish timer for now
         // we can also drive this logic from the interrupt
