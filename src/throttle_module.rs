@@ -16,6 +16,8 @@ use throttle_can_protocol::*;
 // TODO feature gate vehicles
 use kial_soul_ev::*;
 
+// TODO - use some form of println! logging that prefixes with a module name?
+
 struct ThrottleControlState {
     enabled: bool,
     operator_override: bool,
@@ -66,7 +68,7 @@ impl ThrottleModule {
 
             board.throttle_spoof_enable.set_low();
             self.throttle_control_state.enabled = false;
-            writeln!(board.debug_console, "Control disabled");
+            writeln!(board.debug_console, "Throttle control disabled");
         }
     }
 
@@ -78,7 +80,7 @@ impl ThrottleModule {
 
             board.throttle_spoof_enable.set_high();
             self.throttle_control_state.enabled = true;
-            writeln!(board.debug_console, "Control enabled");
+            writeln!(board.debug_console, "Throttle control enabled");
         }
     }
 

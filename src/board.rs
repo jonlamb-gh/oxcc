@@ -5,7 +5,7 @@ use ms_timer::MsTimer;
 use nucleo_f767zi::can::{Can1, Can2};
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::delay::Delay;
-use nucleo_f767zi::hal::gpio::gpiod::PD10;
+use nucleo_f767zi::hal::gpio::gpiod::{PD10, PD11};
 use nucleo_f767zi::hal::gpio::{Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
@@ -28,9 +28,11 @@ type ThrottleSpoofEnable = PD10<Output<PushPull>>;
 //type AcceleratorPositionSensorLow
 // PIN_DAC_CHIP_SELECT, etc
 
+type SteeringSpoofEnable = PD11<Output<PushPull>>;
+
 type CanPublishTimer = Timer<TIM2>;
 
-pub const CAN_PUBLISH_HZ: u32 = 50;
+const CAN_PUBLISH_HZ: u32 = 50;
 
 pub struct Board {
     pub semihost_console: hio::HStdout,
@@ -43,6 +45,7 @@ pub struct Board {
     pub control_can: ControlCan,
     pub obd_can: ObdCan,
     pub throttle_spoof_enable: ThrottleSpoofEnable,
+    pub steering_spoof_enable: SteeringSpoofEnable,
 }
 
 impl Board {
@@ -63,6 +66,9 @@ impl Board {
         // pins container for each module?
         let throttle_spoof_enable = gpiod
             .pd10
+            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
+        let steering_spoof_enable = gpiod
+            .pd11
             .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
 
         let usart3_tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
@@ -117,6 +123,7 @@ impl Board {
             control_can: Can1::new(),
             obd_can: Can2::new(),
             throttle_spoof_enable,
+            steering_spoof_enable,
         }
     }
 }

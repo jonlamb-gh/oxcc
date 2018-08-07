@@ -19,6 +19,7 @@ mod dual_signal;
 mod fault_condition;
 mod ms_timer;
 mod pid;
+mod steering_module;
 mod throttle_module;
 
 #[path = "can_protocols/fault_can_protocol.rs"]
@@ -36,6 +37,7 @@ use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
+use steering_module::SteeringModule;
 use throttle_module::ThrottleModule;
 
 // Interrupt safe access
@@ -48,14 +50,18 @@ use throttle_module::ThrottleModule;
 entry!(main);
 
 fn main() -> ! {
+    // once the organization is cleaned up, the entire board doesn't need to be
+    // mutable let Board {mut leds, mut delay, ..} = Board::new();
     let mut board = Board::new();
 
     // TODO - just for testing
     board.leds[led::Color::Blue].on();
 
     let mut throttle = ThrottleModule::new();
+    let mut steering = SteeringModule::new();
 
     throttle.init_devices(&mut board);
+    steering.init_devices(&mut board);
 
     // TODO - impl for gpio::ToggleableOutputPin in BSP crate to get toggle()
     let mut led_state = false;
@@ -67,11 +73,14 @@ fn main() -> ! {
          */
         if false {
             throttle.adc_input(0, 0);
+            steering.adc_input(0, 0);
         }
 
         throttle.check_for_incoming_message(&mut board);
+        steering.check_for_incoming_message(&mut board);
 
         throttle.check_for_faults(&mut board);
+        steering.check_for_faults(&mut board);
 
         // TODO - just polling the publish timer for now
         // we can also drive this logic from the interrupt
@@ -85,6 +94,7 @@ fn main() -> ! {
             led_state = !led_state;
 
             throttle.publish_throttle_report(&mut board);
+            steering.publish_steering_report(&mut board);
         }
     }
 }
