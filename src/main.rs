@@ -19,7 +19,6 @@ mod dtc;
 mod dual_signal;
 mod fault_condition;
 mod ms_timer;
-mod pid;
 mod steering_module;
 mod throttle_module;
 
