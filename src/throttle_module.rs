@@ -108,7 +108,6 @@ impl ThrottleModule {
         }
     }
 
-    // Normally via an interrupt handler.
     pub fn adc_input(&mut self, high: u16, low: u16) {
         self.accelerator_position.update(high, low);
     }

@@ -26,8 +26,11 @@ mod throttle_module;
 mod fault_can_protocol;
 #[path = "can_protocols/oscc_magic_byte.rs"]
 mod oscc_magic_byte;
+#[path = "can_protocols/steering_can_protocol.rs"]
+mod steering_can_protocol;
 #[path = "can_protocols/throttle_can_protocol.rs"]
 mod throttle_can_protocol;
+
 // TODO - feature gate this as vehicle
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;

@@ -1,3 +1,5 @@
+use num;
+
 pub struct DualSignal {
     high: u16,
     low: u16,
@@ -15,6 +17,10 @@ impl DualSignal {
 
     pub fn average(&self) -> u32 {
         (self.low as u32 + self.high as u32) / 2
+    }
+
+    pub fn diff(&self) -> u16 {
+        num::abs((self.high as i32) - (self.low as i32)) as u16
     }
 
     pub fn high(&self) -> u16 {

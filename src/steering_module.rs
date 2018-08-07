@@ -9,12 +9,14 @@ use fault_condition::FaultCondition;
 use nucleo_f767zi::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
-//use steering_can_protocol::*;
+use steering_can_protocol::*;
 
 // TODO feature gate vehicles
 use kial_soul_ev::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
+
+const FILTER_ALPHA: f32 = 0.01_f32;
 
 struct SteeringControlState {
     enabled: bool,
@@ -36,8 +38,9 @@ pub struct SteeringModule {
     steering_torque: DualSignal,
     control_state: SteeringControlState,
     grounded_fault_state: FaultCondition,
-    /*throttle_report: OsccThrottleReport,
-     *fault_report_frame: OsccFaultReportFrame, */
+    filtered_diff: u16,
+    /* throttle_report: OsccThrottleReport, */
+    /* fault_report_frame: OsccFaultReportFrame, */
 }
 
 impl SteeringModule {
@@ -46,8 +49,9 @@ impl SteeringModule {
             steering_torque: DualSignal::new(0, 0),
             control_state: SteeringControlState::new(),
             grounded_fault_state: FaultCondition::new(),
-            /*throttle_report: OsccThrottleReport::new(),
-             *fault_report_frame: OsccFaultReportFrame::new(), */
+            filtered_diff: 0,
+            /* throttle_report: OsccThrottleReport::new(), */
+            /* fault_report_frame: OsccFaultReportFrame::new(), */
         }
     }
 
@@ -102,13 +106,67 @@ impl SteeringModule {
             // TODO - revisit this, enforce high->A, low->B
             board.dac.set_outputs(spoof_high, spoof_low);
         }
-
     }
 
-    // Normally via an interrupt handler.
-    pub fn adc_input(&mut self, high: u16, low: u16) {}
+    pub fn adc_input(&mut self, high: u16, low: u16) {
+        self.steering_torque.update(high, low);
+    }
 
-    pub fn check_for_faults(&mut self, board: &mut Board) {}
+    pub fn check_for_faults(&mut self, board: &mut Board) {
+        if self.control_state.enabled && self.control_state.dtcs > 0 {
+            let unfiltered_diff = self.steering_torque.diff();
+
+            if self.filtered_diff == 0 {
+                self.filtered_diff = unfiltered_diff;
+            }
+
+            // TODO - revist this
+            // OSCC goes back and forth with u16 and f32 types
+            self.filtered_diff = self.exponential_moving_average(
+                FILTER_ALPHA,
+                unfiltered_diff as _,
+                self.filtered_diff as _,
+            ) as _;
+
+            let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
+                &self.steering_torque,
+                FAULT_HYSTERESIS,
+                board,
+            );
+
+            // sensor pins tied to ground - a value of zero indicates disconnection
+            if inputs_grounded {
+                self.disable_control(board);
+
+                self.control_state
+                    .dtcs
+                    .set(OSCC_STEERING_DTC_INVALID_SENSOR_VAL);
+
+                self.publish_fault_report(board);
+
+                writeln!(board.debug_console, "Bad value read from torque sensor");
+            } else if self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD {
+                self.disable_control(board);
+
+                self.control_state
+                    .dtcs
+                    .set(OSCC_STEERING_DTC_OPERATOR_OVERRIDE);
+
+                self.publish_fault_report(board);
+
+                self.control_state.operator_override = true;
+
+                writeln!(board.debug_console, "Steering operator override");
+            } else {
+                self.control_state.dtcs = 0;
+                self.control_state.operator_override = false;
+            }
+        }
+    }
+
+    fn exponential_moving_average(&self, alpha: f32, input: f32, average: f32) -> f32 {
+        (alpha * input) + ((1.0 - alpha) * average)
+    }
 
     pub fn publish_steering_report(&mut self, board: &mut Board) {}
 
