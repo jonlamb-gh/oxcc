@@ -5,7 +5,7 @@ use ms_timer::MsTimer;
 use nucleo_f767zi::can::{Can1, Can2};
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::delay::Delay;
-use nucleo_f767zi::hal::gpio::gpiod::{PD10, PD11};
+use nucleo_f767zi::hal::gpio::gpiod::{PD10, PD11, PD12, PD13};
 use nucleo_f767zi::hal::gpio::{Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
@@ -30,6 +30,9 @@ type ThrottleSpoofEnable = PD10<Output<PushPull>>;
 
 type SteeringSpoofEnable = PD11<Output<PushPull>>;
 
+type BrakeSpoofEnable = PD12<Output<PushPull>>;
+type BrakeLightEnable = PD13<Output<PushPull>>;
+
 type CanPublishTimer = Timer<TIM2>;
 
 const CAN_PUBLISH_HZ: u32 = 50;
@@ -46,6 +49,8 @@ pub struct Board {
     pub obd_can: ObdCan,
     pub throttle_spoof_enable: ThrottleSpoofEnable,
     pub steering_spoof_enable: SteeringSpoofEnable,
+    pub brake_spoof_enable: BrakeSpoofEnable,
+    pub brake_light_enable: BrakeLightEnable,
 }
 
 impl Board {
@@ -69,6 +74,12 @@ impl Board {
             .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
         let steering_spoof_enable = gpiod
             .pd11
+            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
+        let brake_spoof_enable = gpiod
+            .pd12
+            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
+        let brake_light_enable = gpiod
+            .pd13
             .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
 
         let usart3_tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
@@ -124,6 +135,8 @@ impl Board {
             obd_can: Can2::new(),
             throttle_spoof_enable,
             steering_spoof_enable,
+            brake_spoof_enable,
+            brake_light_enable,
         }
     }
 }

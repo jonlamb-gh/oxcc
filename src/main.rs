@@ -22,6 +22,12 @@ mod pid;
 mod steering_module;
 mod throttle_module;
 
+// TODO - feature gate
+#[path = "brake/kial_soul_ev_niro/brake_module.rs"]
+mod brake_module;
+
+#[path = "can_protocols/brake_can_protocol.rs"]
+mod brake_can_protocol;
 #[path = "can_protocols/fault_can_protocol.rs"]
 mod fault_can_protocol;
 #[path = "can_protocols/oscc_magic_byte.rs"]
@@ -36,6 +42,7 @@ mod throttle_can_protocol;
 mod kial_soul_ev;
 
 use board::Board;
+use brake_module::BrakeModule;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
@@ -60,9 +67,11 @@ fn main() -> ! {
     // TODO - just for testing
     board.leds[led::Color::Blue].on();
 
+    let mut brake = BrakeModule::new();
     let mut throttle = ThrottleModule::new();
     let mut steering = SteeringModule::new();
 
+    brake.init_devices(&mut board);
     throttle.init_devices(&mut board);
     steering.init_devices(&mut board);
 
@@ -75,13 +84,16 @@ fn main() -> ! {
          * throttle.adc_input(high, low);
          */
         if false {
+            brake.adc_input(0, 0);
             throttle.adc_input(0, 0);
             steering.adc_input(0, 0);
         }
 
+        brake.check_for_incoming_message(&mut board);
         throttle.check_for_incoming_message(&mut board);
         steering.check_for_incoming_message(&mut board);
 
+        brake.check_for_faults(&mut board);
         throttle.check_for_faults(&mut board);
         steering.check_for_faults(&mut board);
 
@@ -96,6 +108,7 @@ fn main() -> ! {
             }
             led_state = !led_state;
 
+            brake.publish_brake_report(&mut board);
             throttle.publish_throttle_report(&mut board);
             steering.publish_steering_report(&mut board);
         }
