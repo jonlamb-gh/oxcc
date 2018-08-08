@@ -130,6 +130,15 @@ fn main() -> ! {
             brake.publish_brake_report(&mut board);
             throttle.publish_throttle_report(&mut board);
             steering.publish_steering_report(&mut board);
+
+            // TODO - TESTING
+            cortex_m::interrupt::free(|cs| {
+                let adc_storage = ADC_STORAGE.borrow(cs).borrow();
+                let cnt = adc_storage.count();
+                let value: u16 = adc_storage[Signal::BrakePedalPositionSensorHigh];
+
+                writeln!(board.debug_console, "{} = {}", cnt, value);
+            });
         }
     }
 }
@@ -140,11 +149,17 @@ interrupt!(ADC, adc_isr);
 // TODO might have to use unsafe style like here in RCC
 // https://github.com/jonlamb-gh/stm32f767-hal/blob/devel/src/rcc.rs#L262
 fn adc_isr() {
+    panic!("ADC WORKING ISR");
+
+    /*
     cortex_m::interrupt::free(|cs| {
-        let _adc_storage = ADC_STORAGE.borrow(cs).borrow_mut();
+        let mut adc_storage = ADC_STORAGE.borrow(cs).borrow_mut();
+
+        adc_storage.increment();
 
         // TODO
     });
+    */
 }
 
 exception!(HardFault, hard_fault);

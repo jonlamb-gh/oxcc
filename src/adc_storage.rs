@@ -11,11 +11,23 @@ pub enum Signal {
 
 pub struct AdcStorage {
     samples: [u16; 6],
+    count: u64,
 }
 
 impl AdcStorage {
     pub const fn new() -> Self {
-        AdcStorage { samples: [0; 6] }
+        AdcStorage {
+            samples: [0; 6],
+            count: 0,
+        }
+    }
+
+    pub fn increment(&mut self) {
+        self.count += 1;
+    }
+
+    pub fn count(&self) -> u64 {
+        self.count
     }
 }
 
