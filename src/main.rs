@@ -20,6 +20,7 @@ mod fault_condition;
 mod ms_timer;
 mod steering_module;
 mod throttle_module;
+mod types;
 
 // TODO - feature gate
 #[path = "brake/kial_soul_ev_niro/brake_module.rs"]
@@ -74,28 +75,6 @@ fn main() -> ! {
     // TODO - impl for gpio::ToggleableOutputPin in BSP crate to get toggle()
     let mut led_state = false;
     loop {
-        // interrupt handler continously updates the ADC samples
-        /*
-        cortex_m::interrupt::free(|cs| {
-            let adc_storage = ADC_STORAGE.borrow(cs).borrow();
-
-            brake.adc_input(
-                adc_storage[Signal::BrakePedalPositionSensorHigh],
-                adc_storage[Signal::BrakePedalPositionSensorLow],
-            );
-
-            throttle.adc_input(
-                adc_storage[Signal::AcceleratorPositionSensorHigh],
-                adc_storage[Signal::AcceleratorPositionSensorLow],
-            );
-
-            steering.adc_input(
-                adc_storage[Signal::TorqueSensorHigh],
-                adc_storage[Signal::TorqueSensorLow],
-            );
-        });
-        */
-
         brake.check_for_incoming_message(&mut board);
         throttle.check_for_incoming_message(&mut board);
         steering.check_for_incoming_message(&mut board);

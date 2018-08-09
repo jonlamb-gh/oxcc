@@ -6,51 +6,22 @@ use ms_timer::MsTimer;
 use nucleo_f767zi::can::{Can1, Can2};
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::delay::Delay;
-use nucleo_f767zi::hal::gpio::gpioa::PA3;
-use nucleo_f767zi::hal::gpio::gpioc::{PC0, PC3};
-use nucleo_f767zi::hal::gpio::gpiod::{PD10, PD11, PD12, PD13};
-use nucleo_f767zi::hal::gpio::gpiof::{PF10, PF3, PF5};
-use nucleo_f767zi::hal::gpio::{Analog, Input, Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
-use nucleo_f767zi::hal::stm32f7x7::{ADC1, TIM2, C_ADC, RCC};
-use nucleo_f767zi::hal::timer::Timer;
+use nucleo_f767zi::hal::stm32f7x7::{ADC1, C_ADC, RCC};
 use nucleo_f767zi::led::Leds;
 use sh::hio;
+
+// TODO - is this needed
+pub use types::*;
 
 // feature to pick how to route up debug_println/println?
 // or
 // - println! -> Serial3 console (currently debug_console)
 // - debug_println! -> ITM/semihosting link
 
-pub type ControlCan = Can1;
-pub type ObdCan = Can2;
-
-type ThrottleSpoofEnable = PD10<Output<PushPull>>;
-type AcceleratorPositionSensorHighPin = PA3<Input<Analog>>; // ADC123_IN3
-type AcceleratorPositionSensorLowPin = PC0<Input<Analog>>; // ADC123_IN10
-
-type SteeringSpoofEnable = PD11<Output<PushPull>>;
-type TorqueSensorHighPin = PC3<Input<Analog>>; // ADC123_IN13
-type TorqueSensorLowPin = PF3<Input<Analog>>; // ADC3_IN9
-
-type BrakeSpoofEnable = PD12<Output<PushPull>>;
-type BrakeLightEnable = PD13<Output<PushPull>>;
-type BrakePedalPositionSensorHighPin = PF5<Input<Analog>>; // ADC3_IN15
-type BrakePedalPositionSensorLowPin = PF10<Input<Analog>>; // ADC3_IN8
-
-type CanPublishTimer = Timer<TIM2>;
-
 const CAN_PUBLISH_HZ: u32 = 50;
-
-/*
-pub struct ThrottlePins {
-    pub spoof_enable: ThrottleSpoofEnable,
-    pub accel_pos_sensor_high: AcceleratorPositionSensorHigh,
-    pub accel_pos_sensor_low: AcceleratorPositionSensorLow,
-}
-*/
 
 pub struct Board {
     pub semihost_console: hio::HStdout,
@@ -62,17 +33,10 @@ pub struct Board {
     pub dac: Mcp49xx,
     pub control_can: ControlCan,
     pub obd_can: ObdCan,
-    pub throttle_spoof_enable: ThrottleSpoofEnable,
-    pub steering_spoof_enable: SteeringSpoofEnable,
-    pub brake_spoof_enable: BrakeSpoofEnable,
-    pub brake_light_enable: BrakeLightEnable,
-    // TODO - testing
-    // clean these up
-    pub accel_pos_sensor_high: AcceleratorPositionSensorHighPin,
-    pub accel_pos_sensor_low: AcceleratorPositionSensorLowPin,
-
-    //throttle_pins: ThrottlePins,
     adc1: ADC1,
+    brake_pins: BrakePins,
+    throttle_pins: ThrottlePins,
+    steering_pins: SteeringPins,
 }
 
 impl Board {
@@ -94,30 +58,49 @@ impl Board {
         let mut c_adc = peripherals.C_ADC;
 
         let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
-        let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
         let mut gpioa = peripherals.GPIOA.split(&mut rcc.ahb1);
         let mut gpioc = peripherals.GPIOC.split(&mut rcc.ahb1);
+        let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
+        let mut gpiof = peripherals.GPIOF.split(&mut rcc.ahb1);
 
-        // TODO - put pin defs in board.rs, what else can be typed in BSP crate?
-        // pins container for each module?
-        let throttle_spoof_enable = gpiod
-            .pd10
-            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
-        let steering_spoof_enable = gpiod
-            .pd11
-            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
-        let brake_spoof_enable = gpiod
-            .pd12
-            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
-        let brake_light_enable = gpiod
-            .pd13
-            .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
-        let accel_pos_sensor_high = gpioa
-            .pa3
-            .into_analog_input(&mut gpioa.moder, &mut gpioa.pupdr);
-        let accel_pos_sensor_low = gpioc
-            .pc0
-            .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr);
+        let brake_pins = BrakePins {
+            spoof_enable: gpiod
+                .pd12
+                .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
+            brake_light_enable: gpiod
+                .pd13
+                .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
+            pedal_pos_sensor_high: gpiof
+                .pf5
+                .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
+            pedal_pos_sensor_low: gpiof
+                .pf10
+                .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
+        };
+
+        let throttle_pins = ThrottlePins {
+            spoof_enable: gpiod
+                .pd10
+                .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
+            accel_pos_sensor_high: gpioa
+                .pa3
+                .into_analog_input(&mut gpioa.moder, &mut gpioa.pupdr),
+            accel_pos_sensor_low: gpioc
+                .pc0
+                .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr),
+        };
+
+        let steering_pins = SteeringPins {
+            spoof_enable: gpiod
+                .pd11
+                .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
+            torque_sensor_high: gpioc
+                .pc3
+                .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr),
+            torque_sensor_low: gpiof
+                .pf3
+                .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
+        };
 
         let usart3_tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
         let usart3_rx = gpiod.pd9.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
@@ -176,14 +159,27 @@ impl Board {
             dac: Mcp49xx::new(),
             control_can: Can1::new(),
             obd_can: Can2::new(),
-            throttle_spoof_enable,
-            steering_spoof_enable,
-            brake_spoof_enable,
-            brake_light_enable,
-            accel_pos_sensor_high,
-            accel_pos_sensor_low,
             adc1,
+            brake_pins,
+            throttle_pins,
+            steering_pins,
         }
+    }
+
+    pub fn brake_spoof_enable(&mut self) -> &mut BrakeSpoofEnablePin {
+        &mut self.brake_pins.spoof_enable
+    }
+
+    pub fn brake_light_enable(&mut self) -> &mut BrakeLightEnablePin {
+        &mut self.brake_pins.brake_light_enable
+    }
+
+    pub fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
+        &mut self.throttle_pins.spoof_enable
+    }
+
+    pub fn steering_spoof_enable(&mut self) -> &mut SteeringSpoofEnablePin {
+        &mut self.steering_pins.spoof_enable
     }
 
     pub fn anolog_read(&mut self, signal: AdcSignal, sample_time: AdcSampleTime) -> u16 {
