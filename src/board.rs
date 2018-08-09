@@ -11,6 +11,7 @@ use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, C_ADC, RCC};
 use nucleo_f767zi::led::Leds;
+use nucleo_f767zi::UserButton;
 use sh::hio;
 
 // TODO - is this needed
@@ -33,6 +34,7 @@ pub struct Board {
     pub semihost_console: hio::HStdout,
     pub debug_console: DebugConsole,
     pub leds: Leds,
+    pub user_button: UserButton,
     pub delay: Delay,
     pub timer_ms: MsTimer,
     pub can_publish_timer: CanPublishTimer,
@@ -157,6 +159,9 @@ impl Board {
             semihost_console,
             debug_console: DebugConsole::new(serial),
             leds,
+            user_button: gpioc
+                .pc13
+                .into_pull_up_input(&mut gpioc.moder, &mut gpioc.pupdr),
             delay: Delay::new(core_peripherals.SYST, clocks),
             timer_ms: MsTimer::new(core_peripherals.DWT, clocks),
             can_publish_timer: CanPublishTimer::tim2(
@@ -174,6 +179,10 @@ impl Board {
             throttle_pins,
             steering_pins,
         }
+    }
+
+    pub fn user_button(&mut self) -> bool {
+        self.user_button.is_low()
     }
 
     pub fn brake_spoof_enable(&mut self) -> &mut BrakeSpoofEnablePin {

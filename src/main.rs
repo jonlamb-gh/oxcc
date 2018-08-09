@@ -100,6 +100,11 @@ fn main() -> ! {
             throttle.publish_throttle_report(&mut board);
             steering.publish_steering_report(&mut board);
         }
+
+        // TODO - do anything with the user button?
+        if board.user_button() {
+            panic!("User button pressed");
+        }
     }
 }
 
