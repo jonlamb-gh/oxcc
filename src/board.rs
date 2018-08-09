@@ -1,3 +1,4 @@
+use adc_signal::{AdcChannel, AdcSampleTime, AdcSignal};
 use core::fmt::Write;
 use cortex_m;
 use dac_mcp49xx::Mcp49xx;
@@ -27,17 +28,17 @@ pub type ControlCan = Can1;
 pub type ObdCan = Can2;
 
 type ThrottleSpoofEnable = PD10<Output<PushPull>>;
-type AcceleratorPositionSensorHigh = PA3<Input<Analog>>; // ADC123_IN3
-type AcceleratorPositionSensorLow = PC0<Input<Analog>>; // ADC123_IN10
+type AcceleratorPositionSensorHighPin = PA3<Input<Analog>>; // ADC123_IN3
+type AcceleratorPositionSensorLowPin = PC0<Input<Analog>>; // ADC123_IN10
 
 type SteeringSpoofEnable = PD11<Output<PushPull>>;
-//type TorqueSensorHigh = PC3<Input<Analog>>;
-//type TorqueSensorLow = PF3<Input<Analog>>;
+type TorqueSensorHighPin = PC3<Input<Analog>>; // ADC123_IN13
+type TorqueSensorLowPin = PF3<Input<Analog>>; // ADC3_IN9
 
 type BrakeSpoofEnable = PD12<Output<PushPull>>;
 type BrakeLightEnable = PD13<Output<PushPull>>;
-//type BrakePedalPositionSensorHigh = PF5<Input<Analog>>;
-//type BrakePedalPositionSensorLow = PF10<Input<Analog>>;
+type BrakePedalPositionSensorHighPin = PF5<Input<Analog>>; // ADC3_IN15
+type BrakePedalPositionSensorLowPin = PF10<Input<Analog>>; // ADC3_IN8
 
 type CanPublishTimer = Timer<TIM2>;
 
@@ -66,9 +67,11 @@ pub struct Board {
     pub brake_spoof_enable: BrakeSpoofEnable,
     pub brake_light_enable: BrakeLightEnable,
     // TODO - testing
-    pub accel_pos_sensor_high: AcceleratorPositionSensorHigh,
-    pub accel_pos_sensor_low: AcceleratorPositionSensorLow,
+    // clean these up
+    pub accel_pos_sensor_high: AcceleratorPositionSensorHighPin,
+    pub accel_pos_sensor_low: AcceleratorPositionSensorLowPin,
 
+    //throttle_pins: ThrottlePins,
     adc1: ADC1,
 }
 
@@ -183,20 +186,35 @@ impl Board {
         }
     }
 
-    pub fn anolog_read(&mut self) -> u16 {
-        // IN3
-        self.adc1.sqr3.write(|w| unsafe { w.sq1().bits(3) });
+    pub fn anolog_read(&mut self, signal: AdcSignal, sample_time: AdcSampleTime) -> u16 {
+        let channel = AdcChannel::from(signal);
+        let smpt = u8::from(sample_time);
 
-        // sample time 480 cycles
-        self.adc1.smpr2.write(|w| unsafe { w.smp3().bits(0b111) });
+        // single conversion, uses the 1st conversion in the sequence
+        self.adc1
+            .sqr3
+            .write(|w| unsafe { w.sq1().bits(u8::from(channel)) });
+
+        // sample time in cycles
+        // channel 10:18 uses SMPR1
+        // channel 0:9 uses SMPR2
+        match channel {
+            AdcChannel::Adc123In3 => self.adc1.smpr2.write(|w| unsafe { w.smp3().bits(smpt) }),
+            AdcChannel::Adc3In8 => self.adc1.smpr2.write(|w| unsafe { w.smp8().bits(smpt) }),
+            AdcChannel::Adc3In9 => self.adc1.smpr2.write(|w| w.smp9().bits(smpt)),
+            AdcChannel::Adc123In10 => self.adc1.smpr1.write(|w| unsafe { w.smp10().bits(smpt) }),
+            AdcChannel::Adc123In13 => self.adc1.smpr1.write(|w| unsafe { w.smp13().bits(smpt) }),
+            AdcChannel::Adc3In15 => self.adc1.smpr1.write(|w| unsafe { w.smp15().bits(smpt) }),
+        };
 
         // start conversion
         self.adc1.cr2.modify(|_, w| w.swstart().set_bit());
 
         // wait for conversion to complete
-        while ! self.adc1.sr.read().eoc().bit() {}
+        while !self.adc1.sr.read().eoc().bit() {}
 
-        self.adc1.sr.modify(|_, w| { w
+        self.adc1.sr.modify(|_, w| {
+            w
             // clear regular channel start flag
             .strt().clear_bit()
             // clear end of conversion flag

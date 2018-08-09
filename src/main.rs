@@ -10,7 +10,7 @@ extern crate nucleo_f767zi;
 extern crate num;
 extern crate panic_semihosting;
 
-mod adc_storage;
+mod adc_signal;
 mod board;
 mod can_gateway_module;
 mod dac_mcp49xx;
@@ -40,24 +40,15 @@ mod throttle_can_protocol;
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;
 
-use adc_storage::Signal;
 use board::Board;
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
-use core::cell::RefCell;
 use core::fmt::Write;
-use cortex_m::interrupt::Mutex;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
 use steering_module::SteeringModule;
 use throttle_module::ThrottleModule;
-
-// Global storage for the ADC samples, with interrupt safe access.
-// Filled by the ADC interrupt handler.
-// Consumed by the modules in the main loop.
-static ADC_STORAGE: Mutex<RefCell<adc_storage::AdcStorage>> =
-    Mutex::new(RefCell::new(adc_storage::AdcStorage::new()));
 
 entry!(main);
 
@@ -84,6 +75,7 @@ fn main() -> ! {
     let mut led_state = false;
     loop {
         // interrupt handler continously updates the ADC samples
+        /*
         cortex_m::interrupt::free(|cs| {
             let adc_storage = ADC_STORAGE.borrow(cs).borrow();
 
@@ -102,6 +94,7 @@ fn main() -> ! {
                 adc_storage[Signal::TorqueSensorLow],
             );
         });
+        */
 
         brake.check_for_incoming_message(&mut board);
         throttle.check_for_incoming_message(&mut board);
@@ -129,8 +122,15 @@ fn main() -> ! {
             steering.publish_steering_report(&mut board);
 
             // TODO - TESING
-            let val = board.anolog_read();
-            writeln!(board.debug_console, "{}", val);
+            let val1 = board.anolog_read(
+                adc_signal::AdcSignal::AcceleratorPositionSensorHigh,
+                adc_signal::AdcSampleTime::Cycles480,
+            );
+            let val2 = board.anolog_read(
+                adc_signal::AdcSignal::AcceleratorPositionSensorLow,
+                adc_signal::AdcSampleTime::Cycles480,
+            );
+            writeln!(board.debug_console, "{} {}", val1, val2);
         }
     }
 }
