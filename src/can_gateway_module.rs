@@ -18,7 +18,7 @@ impl CanGatewayModule {
 
     // TODO - error handling
     pub fn republish_obd_frames_to_control_can_bus(&mut self, board: &mut Board) {
-        if let Ok(rx_frame) = board.obd_can.receive() {
+        if let Ok(rx_frame) = board.obd_can().receive() {
             let id: u32 = rx_frame.id().into();
 
             if (id == KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID.into())
@@ -26,7 +26,7 @@ impl CanGatewayModule {
                 || (id == KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID.into())
                 || (id == KIA_SOUL_OBD_THROTTLE_PRESSURE_CAN_ID.into())
             {
-                if let Err(_) = board.control_can.transmit(&rx_frame) {
+                if let Err(_) = board.control_can().transmit(&rx_frame) {
                     // TODO - error handling
                 }
             }

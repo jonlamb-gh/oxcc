@@ -172,19 +172,19 @@ impl BrakeModule {
         self.brake_report.operator_override = self.control_state.operator_override;
         self.brake_report.dtcs = self.control_state.dtcs;
 
-        self.brake_report.transmit(&mut board.control_can);
+        self.brake_report.transmit(&mut board.control_can());
     }
 
     pub fn publish_fault_report(&mut self, board: &mut Board) {
         self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_BRAKE;
         self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
 
-        self.fault_report_frame.transmit(&mut board.control_can);
+        self.fault_report_frame.transmit(&mut board.control_can());
     }
 
     // TODO - error handling
     pub fn check_for_incoming_message(&mut self, board: &mut Board) {
-        if let Ok(rx_frame) = board.control_can.receive() {
+        if let Ok(rx_frame) = board.control_can().receive() {
             if let CanFrame::DataFrame(ref f) = rx_frame {
                 self.process_rx_frame(f, board);
             }

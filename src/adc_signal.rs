@@ -1,3 +1,4 @@
+#[derive(Copy, Clone, Debug)]
 pub enum AdcSampleTime {
     Cycles3,
     Cycles15,
@@ -9,7 +10,7 @@ pub enum AdcSampleTime {
     Cycles480,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum AdcChannel {
     Adc123In3,
     Adc123In10,
@@ -19,6 +20,7 @@ pub enum AdcChannel {
     Adc3In8,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum AdcSignal {
     AcceleratorPositionSensorHigh,
     AcceleratorPositionSensorLow,

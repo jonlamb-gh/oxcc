@@ -99,17 +99,6 @@ fn main() -> ! {
             brake.publish_brake_report(&mut board);
             throttle.publish_throttle_report(&mut board);
             steering.publish_steering_report(&mut board);
-
-            // TODO - TESING
-            let val1 = board.anolog_read(
-                adc_signal::AdcSignal::AcceleratorPositionSensorHigh,
-                adc_signal::AdcSampleTime::Cycles480,
-            );
-            let val2 = board.anolog_read(
-                adc_signal::AdcSignal::AcceleratorPositionSensorLow,
-                adc_signal::AdcSampleTime::Cycles480,
-            );
-            writeln!(board.debug_console, "{} {}", val1, val2);
         }
     }
 }
