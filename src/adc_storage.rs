@@ -9,6 +9,7 @@ pub enum Signal {
     BrakePedalPositionSensorLow,
 }
 
+#[derive(Debug)]
 pub struct AdcStorage {
     samples: [u16; 6],
     count: u64,

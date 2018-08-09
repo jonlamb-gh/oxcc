@@ -137,6 +137,7 @@ fn main() -> ! {
                 let value: u16 = adc_storage[Signal::AcceleratorPositionSensorHigh];
 
                 writeln!(board.debug_console, "{} = {}", cnt, value);
+                //writeln!(board.debug_console, "{:?}", adc_storage);
             });
         }
     }
@@ -149,11 +150,10 @@ fn adc_isr() {
     cortex_m::interrupt::free(|cs| {
         let mut adc_storage = ADC_STORAGE.borrow(cs).borrow_mut();
 
-        adc_storage.increment();
-
-        let data = board::adc_irq_handler(cs);
-
-        adc_storage[Signal::AcceleratorPositionSensorHigh] = data;
+        if let Some(data) = board::adc_irq_handler(cs) {
+            adc_storage.increment();
+            adc_storage[Signal::AcceleratorPositionSensorHigh] = data;
+        }
 
         // TODO
     });

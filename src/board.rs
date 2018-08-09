@@ -9,7 +9,7 @@ use nucleo_f767zi::hal::gpio::gpioa::PA3;
 use nucleo_f767zi::hal::gpio::gpioc::{PC0, PC3};
 use nucleo_f767zi::hal::gpio::gpiod::{PD10, PD11, PD12, PD13};
 use nucleo_f767zi::hal::gpio::gpiof::{PF10, PF3, PF5};
-use nucleo_f767zi::hal::gpio::{Floating, Input, Output, PushPull};
+use nucleo_f767zi::hal::gpio::{Analog, Input, Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
@@ -27,17 +27,17 @@ pub type ControlCan = Can1;
 pub type ObdCan = Can2;
 
 type ThrottleSpoofEnable = PD10<Output<PushPull>>;
-type AcceleratorPositionSensorHigh = PA3<Input<Floating>>; // ADC123_IN3
-type AcceleratorPositionSensorLow = PC0<Input<Floating>>; // ADC123_IN10
+type AcceleratorPositionSensorHigh = PA3<Input<Analog>>; // ADC123_IN3
+type AcceleratorPositionSensorLow = PC0<Input<Analog>>; // ADC123_IN10
 
 type SteeringSpoofEnable = PD11<Output<PushPull>>;
-type TorqueSensorHigh = PC3<Input<Floating>>;
-type TorqueSensorLow = PF3<Input<Floating>>;
+//type TorqueSensorHigh = PC3<Input<Analog>>;
+//type TorqueSensorLow = PF3<Input<Analog>>;
 
 type BrakeSpoofEnable = PD12<Output<PushPull>>;
 type BrakeLightEnable = PD13<Output<PushPull>>;
-type BrakePedalPositionSensorHigh = PF5<Input<Floating>>;
-type BrakePedalPositionSensorLow = PF10<Input<Floating>>;
+//type BrakePedalPositionSensorHigh = PF5<Input<Analog>>;
+//type BrakePedalPositionSensorLow = PF10<Input<Analog>>;
 
 type CanPublishTimer = Timer<TIM2>;
 
@@ -108,10 +108,10 @@ impl Board {
             .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper);
         let accel_pos_sensor_high = gpioa
             .pa3
-            .into_floating_input(&mut gpioa.moder, &mut gpioa.pupdr);
+            .into_analog_input(&mut gpioa.moder, &mut gpioa.pupdr);
         let accel_pos_sensor_low = gpioc
             .pc0
-            .into_floating_input(&mut gpioc.moder, &mut gpioc.pupdr);
+            .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr);
 
         let usart3_tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
         let usart3_rx = gpiod.pd9.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
@@ -182,21 +182,29 @@ impl Board {
 // TODO - need to manage bits like the HAL does:
 // https://github.com/jonlamb-gh/STM32Cube_FW_F7_V1.8.0/blob/master/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_adc.c#L866
 // not sure a cs is needed, since we can't borrow the peripherals anymore?
-pub fn adc_irq_handler(_cs: &cortex_m::interrupt::CriticalSection) -> u16 {
+pub fn adc_irq_handler(_cs: &cortex_m::interrupt::CriticalSection) -> Option<u16> {
     let adc1 = unsafe { &*ADC1::ptr() };
-    let data = adc1.dr.read().data().bits();
 
-    // EOCS = 0, but do I need = 1 to catch and save each conversion
-    // need to know which channel it is?
+    // clear overrun flag
+    adc1.sr.modify(|_, w| w.ovr().clear_bit());
 
-    // clear regular channel start flag and end of conversion flag
-    adc1.sr
-        .modify(|_, w| w.strt().clear_bit().eoc().clear_bit());
+    // check end of conversion flag for regular channels
+    if adc1.sr.read().eoc().bit() == true {
+        adc1.sr.modify(|_, w| {
+            w
+            // clear regular channel start flag
+            .strt().clear_bit()
+            // clear end of conversion flag
+            .eoc().clear_bit()
+        });
 
-    data
+        return Some(adc1.dr.read().data().bits());
+    }
+
+    None
 }
 
-// TODO - need to enable safe API bits in the HAL crate
+// TODO - need to enable safe API bits in the HAL crate with config params
 fn start_adc(nvic: &mut NVIC) {
     cortex_m::interrupt::free(|_cs| {
         let rcc = unsafe { &*RCC::ptr() };
@@ -207,10 +215,14 @@ fn start_adc(nvic: &mut NVIC) {
         rcc.apb2rstr.modify(|_, w| w.adcrst().set_bit());
         rcc.apb2rstr.modify(|_, w| w.adcrst().clear_bit());
 
+        // stop conversions while being configured
+        adc1.cr2.modify(|_, w| w.swstart().clear_bit());
+
         // enable ADC1/2/3 peripheral clocks
         rcc.apb2enr
             .modify(|_, w| w.adc1en().set_bit().adc2en().set_bit().adc3en().set_bit());
 
+        // TODO - need to update this once RCC is updated
         // set ADC prescaler, PCLK2 divided by 8
         c_adc.ccr.write(|w| unsafe { w.adcpre().bits(0b11) });
 
@@ -227,17 +239,23 @@ fn start_adc(nvic: &mut NVIC) {
             .jawden().clear_bit()
             // enable end of conversion interrupt
             .eocie().set_bit()
+            // disable discontinuous mode
+            .discen().clear_bit()
         });
 
         adc1.cr2.write(|w| {
             w
+            // trigger detection disabled
+            .exten().bits(0b00)
             // right alignment
             .align().clear_bit()
             // EOC set at the end of each sequence
             .eocs().clear_bit()
             // continuous conversion mode
             .cont().set_bit()
-            .adon().set_bit()
+            // disable DMA
+            .dds().clear_bit()
+            .dma().clear_bit()
         });
 
         // TODO - update this with all AINs
@@ -255,10 +273,16 @@ fn start_adc(nvic: &mut NVIC) {
         adc1.smpr1.write(|w| unsafe { w.smp10().bits(0b111) });
         adc1.smpr2.write(|w| unsafe { w.smp3().bits(0b111) });
 
-        // power on - moved up to others
-        //adc1.cr2.modify(|_, w| w.adon().set_bit());
+        // enable the ADC peripheral if needed, stabilizing if so
+        if adc1.cr2.read().adon().bit() == false {
+            adc1.cr2.modify(|_, w| w.adon().set_bit());
 
-        // TODO - calibration?
+            // TODO - counter = (ADC_STAB_DELAY_US * (SystemCoreClock / 1000000));
+            cortex_m::asm::delay(100);
+        }
+
+        // clear regular group conversion flag and overrun flag
+        adc1.sr.modify(|_, w| w.ovr().clear_bit().eoc().clear_bit());
 
         // start conversion of regular channels
         adc1.cr2.modify(|_, w| w.swstart().set_bit());
