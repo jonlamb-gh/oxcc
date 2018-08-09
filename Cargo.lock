@@ -138,7 +138,6 @@ dependencies = [
  "nucleo-f767zi 0.0.1 (git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel)",
  "num 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "panic-semihosting 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "stm32f7 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -159,17 +158,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "stm32f7"
 version = "0.2.2"
 source = "git+https://github.com/jonlamb-gh/stm32-rs.git?branch=stm32f767zit6-patches#ab973efb75dff6d76e1b5acdd83769bbbaab0618"
-dependencies = [
- "bare-metal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "cortex-m 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "cortex-m-rt 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "vcell 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "stm32f7"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bare-metal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -229,7 +217,6 @@ dependencies = [
 "checksum panic-semihosting 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "52f64dcd9aebf9d40f8c40ab4400bab503c89997330b8d775c20f373bf0e13fc"
 "checksum r0 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e2a38df5b15c8d5c7e8654189744d8e396bddc18ad48041a500ce52d6948941f"
 "checksum stm32f7 0.2.2 (git+https://github.com/jonlamb-gh/stm32-rs.git?branch=stm32f767zit6-patches)" = "<none>"
-"checksum stm32f7 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f7b4a4c4481b6e6d7e013de07e8dcdd9f0fbaa92c1f2493ea5250f9b3aa6d464"
 "checksum stm32f767-hal 0.0.1 (git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel)" = "<none>"
 "checksum vcell 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "45c297f0afb6928cd08ab1ff9d95e99392595ea25ae1b5ecf822ff8764e57a0d"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"

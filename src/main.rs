@@ -6,8 +6,6 @@ extern crate cortex_m;
 #[macro_use]
 extern crate cortex_m_rt as rt;
 extern crate cortex_m_semihosting as sh;
-#[macro_use]
-extern crate stm32f7;
 extern crate nucleo_f767zi;
 extern crate num;
 extern crate panic_semihosting;
@@ -130,33 +128,11 @@ fn main() -> ! {
             throttle.publish_throttle_report(&mut board);
             steering.publish_steering_report(&mut board);
 
-            // TODO - TESTING
-            cortex_m::interrupt::free(|cs| {
-                let adc_storage = ADC_STORAGE.borrow(cs).borrow();
-                let cnt = adc_storage.count();
-                let value: u16 = adc_storage[Signal::AcceleratorPositionSensorHigh];
-
-                writeln!(board.debug_console, "{} = {}", cnt, value);
-                //writeln!(board.debug_console, "{:?}", adc_storage);
-            });
+            // TODO - TESING
+            let val = board.anolog_read();
+            writeln!(board.debug_console, "{}", val);
         }
     }
-}
-
-// ADC1 global interrupt
-interrupt!(ADC, adc_isr);
-
-fn adc_isr() {
-    cortex_m::interrupt::free(|cs| {
-        let mut adc_storage = ADC_STORAGE.borrow(cs).borrow_mut();
-
-        if let Some(data) = board::adc_irq_handler(cs) {
-            adc_storage.increment();
-            adc_storage[Signal::AcceleratorPositionSensorHigh] = data;
-        }
-
-        // TODO
-    });
 }
 
 exception!(HardFault, hard_fault);

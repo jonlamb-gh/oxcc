@@ -16,10 +16,6 @@ features = ["const-fn"]
 version = "0.5.1"
 features = ["device"]
 
-[dependencies.stm32f7]
-version = "0.2.2"
-features = ["stm32f7x7", "rt"]
-
 [dependencies.nucleo-f767zi]
 version = "0.0.1"
 git = "https://github.com/jonlamb-gh/nucleo-f767zi.git"

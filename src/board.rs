@@ -13,7 +13,7 @@ use nucleo_f767zi::hal::gpio::{Analog, Input, Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
-use nucleo_f767zi::hal::stm32f7x7::{ADC1, Interrupt, TIM2, C_ADC, NVIC, RCC};
+use nucleo_f767zi::hal::stm32f7x7::{ADC1, TIM2, C_ADC, RCC};
 use nucleo_f767zi::hal::timer::Timer;
 use nucleo_f767zi::led::Leds;
 use sh::hio;
@@ -68,6 +68,8 @@ pub struct Board {
     // TODO - testing
     pub accel_pos_sensor_high: AcceleratorPositionSensorHigh,
     pub accel_pos_sensor_low: AcceleratorPositionSensorLow,
+
+    adc1: ADC1,
 }
 
 impl Board {
@@ -85,7 +87,8 @@ impl Board {
 
         let mut flash = peripherals.FLASH.constrain();
         let mut rcc = peripherals.RCC.constrain();
-        let mut nvic = core_peripherals.NVIC;
+        let mut adc1 = peripherals.ADC1;
+        let mut c_adc = peripherals.C_ADC;
 
         let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
         let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
@@ -124,8 +127,10 @@ impl Board {
         //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut
         // flash.acr);
 
-        // configure and start the ADC conversions
-        start_adc(&mut nvic);
+        // TODO - need to push this down into the HAL in order to access
+        // the constained RCC periphals
+        // configure the ADCs
+        init_adc(&mut adc1, &mut c_adc);
 
         // TODO - use the safe APIs once this block solidifies
         unsafe {
@@ -174,121 +179,97 @@ impl Board {
             brake_light_enable,
             accel_pos_sensor_high,
             accel_pos_sensor_low,
+            adc1,
         }
     }
-}
 
-// TODO - this will be moved into the BSP/HAL crate areas once it's developed
-// TODO - need to manage bits like the HAL does:
-// https://github.com/jonlamb-gh/STM32Cube_FW_F7_V1.8.0/blob/master/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_adc.c#L866
-// not sure a cs is needed, since we can't borrow the peripherals anymore?
-pub fn adc_irq_handler(_cs: &cortex_m::interrupt::CriticalSection) -> Option<u16> {
-    let adc1 = unsafe { &*ADC1::ptr() };
+    pub fn anolog_read(&mut self) -> u16 {
+        // IN3
+        self.adc1.sqr3.write(|w| unsafe { w.sq1().bits(3) });
 
-    // clear overrun flag
-    adc1.sr.modify(|_, w| w.ovr().clear_bit());
+        // sample time 480 cycles
+        self.adc1.smpr2.write(|w| unsafe { w.smp3().bits(0b111) });
 
-    // check end of conversion flag for regular channels
-    if adc1.sr.read().eoc().bit() == true {
-        adc1.sr.modify(|_, w| {
-            w
+        // start conversion
+        self.adc1.cr2.modify(|_, w| w.swstart().set_bit());
+
+        // wait for conversion to complete
+        while ! self.adc1.sr.read().eoc().bit() {}
+
+        self.adc1.sr.modify(|_, w| { w
             // clear regular channel start flag
             .strt().clear_bit()
             // clear end of conversion flag
             .eoc().clear_bit()
         });
 
-        return Some(adc1.dr.read().data().bits());
+        self.adc1.dr.read().data().bits()
     }
-
-    None
 }
 
 // TODO - need to enable safe API bits in the HAL crate with config params
-fn start_adc(nvic: &mut NVIC) {
-    cortex_m::interrupt::free(|_cs| {
-        let rcc = unsafe { &*RCC::ptr() };
-        let adc1 = unsafe { &*ADC1::ptr() };
-        let c_adc = unsafe { &*C_ADC::ptr() };
+// DMA would be nice, to enable sequencing
+fn init_adc(adc1: &mut ADC1, c_adc: &mut C_ADC) {
+    let rcc = unsafe { &*RCC::ptr() };
 
-        // ADC reset and release
-        rcc.apb2rstr.modify(|_, w| w.adcrst().set_bit());
-        rcc.apb2rstr.modify(|_, w| w.adcrst().clear_bit());
+    // ADC reset and release
+    rcc.apb2rstr.modify(|_, w| w.adcrst().set_bit());
+    rcc.apb2rstr.modify(|_, w| w.adcrst().clear_bit());
 
-        // stop conversions while being configured
-        adc1.cr2.modify(|_, w| w.swstart().clear_bit());
+    // stop conversions while being configured
+    adc1.cr2.modify(|_, w| w.swstart().clear_bit());
 
-        // enable ADC1/2/3 peripheral clocks
-        rcc.apb2enr
-            .modify(|_, w| w.adc1en().set_bit().adc2en().set_bit().adc3en().set_bit());
+    // enable ADC1/2/3 peripheral clocks
+    rcc.apb2enr
+        .modify(|_, w| w.adc1en().set_bit().adc2en().set_bit().adc3en().set_bit());
 
-        // TODO - need to update this once RCC is updated
-        // set ADC prescaler, PCLK2 divided by 8
-        c_adc.ccr.write(|w| unsafe { w.adcpre().bits(0b11) });
+    // TODO - need to update this once RCC is updated
+    // set ADC prescaler, PCLK2 divided by 4
+    c_adc.ccr.write(|w| unsafe { w.adcpre().bits(0b01) });
 
-        adc1.cr1.write(|w| {
-            w
+    adc1.cr1.write(|w| {
+        w
             // disable overrun interrupt
             .ovrie().clear_bit()
             // 12-bit resolution
             .res().bits(0b00)
-            // enable scan mode
-            .scan().set_bit()
+            // disable scan mode
+            .scan().clear_bit()
             // disable analog watchdog
             .awden().clear_bit()
             .jawden().clear_bit()
-            // enable end of conversion interrupt
-            .eocie().set_bit()
+            // disable end of conversion interrupt
+            .eocie().clear_bit()
             // disable discontinuous mode
             .discen().clear_bit()
-        });
+    });
 
-        adc1.cr2.write(|w| {
-            w
+    adc1.cr2.write(|w| {
+        w
             // trigger detection disabled
             .exten().bits(0b00)
             // right alignment
             .align().clear_bit()
-            // EOC set at the end of each sequence
-            .eocs().clear_bit()
-            // continuous conversion mode
-            .cont().set_bit()
+            // EOC set at the end of each regular conversion
+            .eocs().set_bit()
+            // disable continuous conversion mode
+            .cont().clear_bit()
             // disable DMA
             .dds().clear_bit()
             .dma().clear_bit()
-        });
-
-        // TODO - update this with all AINs
-        // sequence length, 2 channels
-        adc1.sqr1.write(|w| w.l().bits(0b0001));
-
-        // TODO - ADC_SQRx channel configs IN3, IN10
-        // channel conversion sequence in order
-        // IN3, IN10
-        adc1.sqr3
-            .write(|w| unsafe { w.sq1().bits(3).sq2().bits(10) });
-
-        // TODO - ADC_SMPRx - sample time 480 cycles
-        // IN3, IN10
-        adc1.smpr1.write(|w| unsafe { w.smp10().bits(0b111) });
-        adc1.smpr2.write(|w| unsafe { w.smp3().bits(0b111) });
-
-        // enable the ADC peripheral if needed, stabilizing if so
-        if adc1.cr2.read().adon().bit() == false {
-            adc1.cr2.modify(|_, w| w.adon().set_bit());
-
-            // TODO - counter = (ADC_STAB_DELAY_US * (SystemCoreClock / 1000000));
-            cortex_m::asm::delay(100);
-        }
-
-        // clear regular group conversion flag and overrun flag
-        adc1.sr.modify(|_, w| w.ovr().clear_bit().eoc().clear_bit());
-
-        // start conversion of regular channels
-        adc1.cr2.modify(|_, w| w.swstart().set_bit());
-
-        // enable ADC interrupt
-        nvic.clear_pending(Interrupt::ADC);
-        nvic.enable(Interrupt::ADC);
     });
+
+    // single conversion
+    adc1.sqr1.write(|w| w.l().bits(0b0000));
+
+    // enable the ADC peripheral if needed, stabilizing if so
+    if adc1.cr2.read().adon().bit() == false {
+        adc1.cr2.modify(|_, w| w.adon().set_bit());
+
+        // TODO - counter = (ADC_STAB_DELAY_US * (SystemCoreClock / 1000000));
+        cortex_m::asm::delay(100);
+    }
+
+    // clear regular group conversion flag and overrun flag
+    adc1.sr.modify(|_, w| w.ovr().clear_bit().eoc().clear_bit());
 }
