@@ -1,5 +1,6 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/brake/kia_soul_ev_niro
 
+use adc_signal::AdcSignal;
 use board::Board;
 use brake_can_protocol::*;
 use core::fmt::Write;
@@ -43,7 +44,12 @@ pub struct BrakeModule {
 impl BrakeModule {
     pub fn new() -> Self {
         BrakeModule {
-            brake_pedal_position: DualSignal::new(0, 0),
+            brake_pedal_position: DualSignal::new(
+                0,
+                0,
+                AdcSignal::BrakePedalPositionSensorHigh,
+                AdcSignal::BrakePedalPositionSensorLow,
+            ),
             control_state: BrakeControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
@@ -60,9 +66,8 @@ impl BrakeModule {
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
-            board
-                .dac
-                .prevent_signal_discontinuity(&self.brake_pedal_position);
+            self.brake_pedal_position
+                .prevent_signal_discontinuity(board);
 
             board.brake_spoof_enable().set_low();
             board.brake_light_enable().set_low();
@@ -73,9 +78,8 @@ impl BrakeModule {
 
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.control_state.enabled && !self.control_state.operator_override {
-            board
-                .dac
-                .prevent_signal_discontinuity(&self.brake_pedal_position);
+            self.brake_pedal_position
+                .prevent_signal_discontinuity(board);
 
             board.brake_spoof_enable().set_high();
             self.control_state.enabled = true;
@@ -115,12 +119,10 @@ impl BrakeModule {
         }
     }
 
-    pub fn adc_input(&mut self, high: u16, low: u16) {
-        self.brake_pedal_position.update(high, low);
-    }
-
     pub fn check_for_faults(&mut self, board: &mut Board) {
         if self.control_state.enabled && self.control_state.dtcs > 0 {
+            self.read_brake_pedal_position_sensor(board);
+
             let brake_pedal_position_average = self.brake_pedal_position.average();
 
             let operator_overridden: bool =
@@ -253,5 +255,9 @@ impl BrakeModule {
     fn brake_position_to_volts_high(&self, pos: f32) -> f32 {
         pos * (BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX - BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN)
             + BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
+    }
+
+    fn read_brake_pedal_position_sensor(&mut self, board: &mut Board) {
+        self.brake_pedal_position.update(board);
     }
 }

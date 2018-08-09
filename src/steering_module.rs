@@ -1,5 +1,6 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/steering
 
+use adc_signal::AdcSignal;
 use board::Board;
 use core::fmt::Write;
 use dtc::DtcBitfield;
@@ -47,7 +48,12 @@ pub struct SteeringModule {
 impl SteeringModule {
     pub fn new() -> Self {
         SteeringModule {
-            steering_torque: DualSignal::new(0, 0),
+            steering_torque: DualSignal::new(
+                0,
+                0,
+                AdcSignal::TorqueSensorHigh,
+                AdcSignal::TorqueSensorLow,
+            ),
             control_state: SteeringControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             filtered_diff: 0,
@@ -63,9 +69,7 @@ impl SteeringModule {
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
-            board
-                .dac
-                .prevent_signal_discontinuity(&self.steering_torque);
+            self.steering_torque.prevent_signal_discontinuity(board);
 
             board.steering_spoof_enable().set_low();
             self.control_state.enabled = false;
@@ -75,9 +79,7 @@ impl SteeringModule {
 
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.control_state.enabled && !self.control_state.operator_override {
-            board
-                .dac
-                .prevent_signal_discontinuity(&self.steering_torque);
+            self.steering_torque.prevent_signal_discontinuity(board);
 
             board.steering_spoof_enable().set_high();
             self.control_state.enabled = true;
@@ -109,12 +111,10 @@ impl SteeringModule {
         }
     }
 
-    pub fn adc_input(&mut self, high: u16, low: u16) {
-        self.steering_torque.update(high, low);
-    }
-
     pub fn check_for_faults(&mut self, board: &mut Board) {
         if self.control_state.enabled && self.control_state.dtcs > 0 {
+            self.read_torque_sensor(board);
+
             let unfiltered_diff = self.steering_torque.diff();
 
             if self.filtered_diff == 0 {
@@ -255,5 +255,9 @@ impl SteeringModule {
     fn steering_torque_to_volts_high(&self, torque: f32) -> f32 {
         (TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_SCALE * torque)
             + TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_OFFSET
+    }
+
+    fn read_torque_sensor(&mut self, board: &mut Board) {
+        self.steering_torque.update(board);
     }
 }

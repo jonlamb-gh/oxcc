@@ -21,7 +21,13 @@ pub use types::*;
 // - println! -> Serial3 console (currently debug_console)
 // - debug_println! -> ITM/semihosting link
 
-const CAN_PUBLISH_HZ: u32 = 50;
+pub const CAN_PUBLISH_HZ: u32 = 50;
+
+pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
+
+// not sure if the averaging is needed, we might be able to just use a
+// single read with large Cycles480 sample time?
+pub const DAC_SAMPLE_AVERAGE_COUNT: u32 = 20;
 
 pub struct Board {
     pub semihost_console: hio::HStdout,

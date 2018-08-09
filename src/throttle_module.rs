@@ -1,5 +1,6 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/throttle
 
+use adc_signal::AdcSignal;
 use board::Board;
 use core::fmt::Write;
 use dtc::DtcBitfield;
@@ -45,7 +46,12 @@ pub struct ThrottleModule {
 impl ThrottleModule {
     pub fn new() -> Self {
         ThrottleModule {
-            accelerator_position: DualSignal::new(0, 0),
+            accelerator_position: DualSignal::new(
+                0,
+                0,
+                AdcSignal::AcceleratorPositionSensorHigh,
+                AdcSignal::AcceleratorPositionSensorLow,
+            ),
             control_state: ThrottleControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
@@ -61,9 +67,8 @@ impl ThrottleModule {
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
-            board
-                .dac
-                .prevent_signal_discontinuity(&self.accelerator_position);
+            self.accelerator_position
+                .prevent_signal_discontinuity(board);
 
             board.throttle_spoof_enable().set_low();
             self.control_state.enabled = false;
@@ -73,9 +78,8 @@ impl ThrottleModule {
 
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.control_state.enabled && !self.control_state.operator_override {
-            board
-                .dac
-                .prevent_signal_discontinuity(&self.accelerator_position);
+            self.accelerator_position
+                .prevent_signal_discontinuity(board);
 
             board.throttle_spoof_enable().set_high();
             self.control_state.enabled = true;
@@ -107,12 +111,10 @@ impl ThrottleModule {
         }
     }
 
-    pub fn adc_input(&mut self, high: u16, low: u16) {
-        self.accelerator_position.update(high, low);
-    }
-
     pub fn check_for_faults(&mut self, board: &mut Board) {
         if self.control_state.enabled && self.control_state.dtcs > 0 {
+            self.read_accelerator_position_sensor(board);
+
             let accelerator_position_average = self.accelerator_position.average();
 
             let operator_overridden: bool =
@@ -245,5 +247,9 @@ impl ThrottleModule {
     fn throttle_position_to_volts_high(&self, pos: f32) -> f32 {
         pos * (THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX - THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN)
             + THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
+    }
+
+    fn read_accelerator_position_sensor(&mut self, board: &mut Board) {
+        self.accelerator_position.update(board);
     }
 }
