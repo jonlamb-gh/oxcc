@@ -50,7 +50,6 @@ use core::cell::RefCell;
 use core::fmt::Write;
 use cortex_m::interrupt::Mutex;
 use nucleo_f767zi::hal::prelude::*;
-use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
 use steering_module::SteeringModule;
@@ -135,7 +134,7 @@ fn main() -> ! {
             cortex_m::interrupt::free(|cs| {
                 let adc_storage = ADC_STORAGE.borrow(cs).borrow();
                 let cnt = adc_storage.count();
-                let value: u16 = adc_storage[Signal::BrakePedalPositionSensorHigh];
+                let value: u16 = adc_storage[Signal::AcceleratorPositionSensorHigh];
 
                 writeln!(board.debug_console, "{} = {}", cnt, value);
             });
@@ -146,20 +145,18 @@ fn main() -> ! {
 // ADC1 global interrupt
 interrupt!(ADC, adc_isr);
 
-// TODO might have to use unsafe style like here in RCC
-// https://github.com/jonlamb-gh/stm32f767-hal/blob/devel/src/rcc.rs#L262
 fn adc_isr() {
-    panic!("ADC WORKING ISR");
-
-    /*
     cortex_m::interrupt::free(|cs| {
         let mut adc_storage = ADC_STORAGE.borrow(cs).borrow_mut();
 
         adc_storage.increment();
 
+        let data = board::adc_irq_handler(cs);
+
+        adc_storage[Signal::AcceleratorPositionSensorHigh] = data;
+
         // TODO
     });
-    */
 }
 
 exception!(HardFault, hard_fault);
@@ -167,6 +164,7 @@ exception!(HardFault, hard_fault);
 // TODO - any safety related things we can do in these contexts (disable
 // controls, LEDs, etc)?
 fn hard_fault(ef: &ExceptionFrame) -> ! {
+    /* steal() is not correct
     cortex_m::interrupt::free(|_cs| unsafe {
         let peripherals = stm32f7x7::Peripherals::steal();
         let mut rcc = peripherals.RCC.constrain();
@@ -175,6 +173,7 @@ fn hard_fault(ef: &ExceptionFrame) -> ! {
         let mut leds = led::Leds::new(gpiob);
         leds[led::Color::Red].on();
     });
+    */
 
     panic!("HardFault at {:#?}", ef);
 }
@@ -182,6 +181,7 @@ fn hard_fault(ef: &ExceptionFrame) -> ! {
 exception!(*, default_handler);
 
 fn default_handler(irqn: i16) {
+    /* steal() is not correct
     cortex_m::interrupt::free(|_cs| unsafe {
         let peripherals = stm32f7x7::Peripherals::steal();
         let mut rcc = peripherals.RCC.constrain();
@@ -190,6 +190,7 @@ fn default_handler(irqn: i16) {
         let mut leds = led::Leds::new(gpiob);
         leds[led::Color::Red].on();
     });
+    */
 
     panic!("Unhandled exception (IRQn = {})", irqn);
 }

@@ -13,7 +13,7 @@ use nucleo_f767zi::hal::gpio::{Floating, Input, Output, PushPull};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
-use nucleo_f767zi::hal::stm32f7x7::{ADC1, Interrupt, TIM2, NVIC, RCC};
+use nucleo_f767zi::hal::stm32f7x7::{ADC1, Interrupt, TIM2, C_ADC, NVIC, RCC};
 use nucleo_f767zi::hal::timer::Timer;
 use nucleo_f767zi::led::Leds;
 use sh::hio;
@@ -73,10 +73,15 @@ pub struct Board {
 impl Board {
     pub fn new() -> Self {
         let mut semihost_console = hio::hstdout().unwrap();
-        writeln!(semihost_console, "System starting").unwrap();
+        writeln!(semihost_console, "System starting");
 
-        let core_peripherals = cortex_m::Peripherals::take().unwrap();
+        let mut core_peripherals = cortex_m::Peripherals::take().unwrap();
         let peripherals = stm32f7x7::Peripherals::take().unwrap();
+
+        core_peripherals.SCB.enable_icache();
+        core_peripherals
+            .SCB
+            .enable_dcache(&mut core_peripherals.CPUID);
 
         let mut flash = peripherals.FLASH.constrain();
         let mut rcc = peripherals.RCC.constrain();
@@ -173,72 +178,93 @@ impl Board {
     }
 }
 
-// TODO - this isn't working yet
+// TODO - this will be moved into the BSP/HAL crate areas once it's developed
+// TODO - need to manage bits like the HAL does:
+// https://github.com/jonlamb-gh/STM32Cube_FW_F7_V1.8.0/blob/master/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_adc.c#L866
+// not sure a cs is needed, since we can't borrow the peripherals anymore?
+pub fn adc_irq_handler(_cs: &cortex_m::interrupt::CriticalSection) -> u16 {
+    let adc1 = unsafe { &*ADC1::ptr() };
+    let data = adc1.dr.read().data().bits();
+
+    // EOCS = 0, but do I need = 1 to catch and save each conversion
+    // need to know which channel it is?
+
+    // clear regular channel start flag and end of conversion flag
+    adc1.sr
+        .modify(|_, w| w.strt().clear_bit().eoc().clear_bit());
+
+    data
+}
+
+// TODO - need to enable safe API bits in the HAL crate
 fn start_adc(nvic: &mut NVIC) {
-    // TODO - need to enable safe API bits in the HAL crate
     cortex_m::interrupt::free(|_cs| {
         let rcc = unsafe { &*RCC::ptr() };
         let adc1 = unsafe { &*ADC1::ptr() };
+        let c_adc = unsafe { &*C_ADC::ptr() };
 
-        // enable ADC123 peripheral clocks
-        rcc.apb2enr.write(|w| w.adc1en().set_bit());
-        rcc.apb2enr.write(|w| w.adc2en().set_bit());
-        rcc.apb2enr.write(|w| w.adc3en().set_bit());
+        // ADC reset and release
+        rcc.apb2rstr.modify(|_, w| w.adcrst().set_bit());
+        rcc.apb2rstr.modify(|_, w| w.adcrst().clear_bit());
 
-        // TODO - our device svd file seems to be missing the CCR?
+        // enable ADC1/2/3 peripheral clocks
+        rcc.apb2enr
+            .modify(|_, w| w.adc1en().set_bit().adc2en().set_bit().adc3en().set_bit());
+
         // set ADC prescaler, PCLK2 divided by 8
-        //adc1.ccr.write(|w| w.adcpre().bits(0b11));
+        c_adc.ccr.write(|w| unsafe { w.adcpre().bits(0b11) });
 
-        // disable overrun interrupt
-        adc1.cr1.write(|w| w.ovrie().clear_bit());
+        adc1.cr1.write(|w| {
+            w
+            // disable overrun interrupt
+            .ovrie().clear_bit()
+            // 12-bit resolution
+            .res().bits(0b00)
+            // enable scan mode
+            .scan().set_bit()
+            // disable analog watchdog
+            .awden().clear_bit()
+            .jawden().clear_bit()
+            // enable end of conversion interrupt
+            .eocie().set_bit()
+        });
 
-        // 12-bit resolution
-        adc1.cr1.write(|w| w.res().bits(0b00));
-
-        // enable scan mode
-        adc1.cr1.write(|w| w.scan().set_bit());
-
-        // disable analog watchdog
-        adc1.cr1.write(|w| w.awden().clear_bit());
-        adc1.cr1.write(|w| w.jawden().clear_bit());
-
-        // enable end of conversion interrupt
-        adc1.cr1.write(|w| w.eocie().set_bit());
-
-        // right alignment
-        adc1.cr2.write(|w| w.align().clear_bit());
-
-        // EOC set at the end of each sequence
-        adc1.cr2.write(|w| w.eocs().clear_bit());
+        adc1.cr2.write(|w| {
+            w
+            // right alignment
+            .align().clear_bit()
+            // EOC set at the end of each sequence
+            .eocs().clear_bit()
+            // continuous conversion mode
+            .cont().set_bit()
+            .adon().set_bit()
+        });
 
         // TODO - update this with all AINs
         // sequence length, 2 channels
-        adc1.sqr1.write(|w| w.l().bits(1));
+        adc1.sqr1.write(|w| w.l().bits(0b0001));
 
         // TODO - ADC_SQRx channel configs IN3, IN10
         // channel conversion sequence in order
         // IN3, IN10
-        adc1.sqr3.write(|w| unsafe { w.sq1().bits(3) });
-        adc1.sqr3.write(|w| unsafe { w.sq2().bits(10) });
+        adc1.sqr3
+            .write(|w| unsafe { w.sq1().bits(3).sq2().bits(10) });
 
         // TODO - ADC_SMPRx - sample time 480 cycles
-        adc1.smpr2.write(|w| unsafe { w.smp0().bits(0b111) });
-        adc1.smpr2.write(|w| unsafe { w.smp1().bits(0b111) });
+        // IN3, IN10
+        adc1.smpr1.write(|w| unsafe { w.smp10().bits(0b111) });
+        adc1.smpr2.write(|w| unsafe { w.smp3().bits(0b111) });
 
-        // continuous conversion mode
-        adc1.cr2.write(|w| w.cont().set_bit());
-
-        // power on
-        adc1.cr2.write(|w| w.adon().set_bit());
+        // power on - moved up to others
+        //adc1.cr2.modify(|_, w| w.adon().set_bit());
 
         // TODO - calibration?
 
         // start conversion of regular channels
-        adc1.cr2.write(|w| w.swstart().set_bit());
+        adc1.cr2.modify(|_, w| w.swstart().set_bit());
 
         // enable ADC interrupt
+        nvic.clear_pending(Interrupt::ADC);
         nvic.enable(Interrupt::ADC);
-
-        // TODO - print out status registers
     });
 }
