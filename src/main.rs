@@ -72,8 +72,6 @@ fn main() -> ! {
     steering.init_devices(&mut board);
     can_gateway.init_devices(&mut board);
 
-    // TODO - impl for gpio::ToggleableOutputPin in BSP crate to get toggle()
-    let mut led_state = false;
     loop {
         brake.check_for_incoming_message(&mut board);
         throttle.check_for_incoming_message(&mut board);
@@ -89,12 +87,7 @@ fn main() -> ! {
         // we can also drive this logic from the interrupt
         // handler if the objects are global and atomic
         if let Ok(_) = board.can_publish_timer.wait() {
-            if led_state {
-                board.leds[led::Color::Green].on();
-            } else {
-                board.leds[led::Color::Green].off();
-            }
-            led_state = !led_state;
+            board.leds[led::Color::Green].toggle();
 
             brake.publish_brake_report(&mut board);
             throttle.publish_throttle_report(&mut board);
