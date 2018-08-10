@@ -117,20 +117,20 @@ impl Board {
             .pb14
             .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
         let led_g = gpiob
-            .pb7
+            .pb0
             .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
         let led_b = gpiob
-            .pb0
+            .pb7
             .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
 
         let usart3_tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
         let usart3_rx = gpiod.pd9.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
 
-        let can1_tx = gpiod.pd1.into_af7(&mut gpiod.moder, &mut gpiod.afrl);
-        let can1_rx = gpiod.pd0.into_af7(&mut gpiod.moder, &mut gpiod.afrl);
+        let can1_tx = gpiod.pd1.into_af9(&mut gpiod.moder, &mut gpiod.afrl);
+        let can1_rx = gpiod.pd0.into_af9(&mut gpiod.moder, &mut gpiod.afrl);
 
-        let can2_tx = gpiob.pb13.into_af7(&mut gpiob.moder, &mut gpiob.afrh);
-        let can2_rx = gpiob.pb12.into_af7(&mut gpiob.moder, &mut gpiob.afrh);
+        let can2_tx = gpiob.pb13.into_af9(&mut gpiob.moder, &mut gpiob.afrh);
+        let can2_rx = gpiob.pb12.into_af9(&mut gpiob.moder, &mut gpiob.afrh);
 
         // default clock configuration runs at 16 MHz
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
@@ -145,6 +145,8 @@ impl Board {
             .pclk2(32.mhz())
             .freeze(&mut flash.acr);
         */
+        
+        //writeln!(semihost_console, "clocks = {:#?}", clocks);
 
         // TODO - need to push this down into the HAL in order to access
         // the constained RCC periphals
@@ -157,8 +159,6 @@ impl Board {
             // unlock registers to enable DWT cycle counter for MsTimer
             core_peripherals.DWT.lar.write(0xC5ACCE55);
         }
-
-        //writeln!(semihost_console, "clocks = {:#?}", clocks);
 
         let mut leds = Leds::new(led_r, led_g, led_b);
         for led in leds.iter_mut() {

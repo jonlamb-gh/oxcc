@@ -4,14 +4,14 @@ use nucleo_f767zi::hal::gpio::gpiob::{PB12, PB13};
 use nucleo_f767zi::hal::gpio::gpioc::{PC0, PC3};
 use nucleo_f767zi::hal::gpio::gpiod::{PD0, PD1, PD10, PD11, PD12, PD13};
 use nucleo_f767zi::hal::gpio::gpiof::{PF10, PF3, PF5};
-use nucleo_f767zi::hal::gpio::{AF7, Analog, Input, Output, PushPull};
+use nucleo_f767zi::hal::gpio::{AF9, Analog, Input, Output, PushPull};
 use nucleo_f767zi::hal::stm32f7x7::{CAN1, CAN2, TIM2};
 use nucleo_f767zi::hal::timer::Timer;
 
 pub type CanPublishTimer = Timer<TIM2>;
 
-pub type ControlCan = Can<CAN1, (PD1<AF7>, PD0<AF7>)>;
-pub type ObdCan = Can<CAN2, (PB13<AF7>, PB12<AF7>)>;
+pub type ControlCan = Can<CAN1, (PD1<AF9>, PD0<AF9>)>;
+pub type ObdCan = Can<CAN2, (PB13<AF9>, PB12<AF9>)>;
 
 pub type BrakeSpoofEnablePin = PD12<Output<PushPull>>;
 pub type BrakeLightEnablePin = PD13<Output<PushPull>>;
