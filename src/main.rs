@@ -118,7 +118,7 @@ exception!(HardFault, hard_fault);
 // TODO - any safety related things we can do in these contexts (disable
 // controls, LEDs, etc)?
 fn hard_fault(ef: &ExceptionFrame) -> ! {
-    /* steal() is not correct
+    /*
     cortex_m::interrupt::free(|_cs| unsafe {
         let peripherals = stm32f7x7::Peripherals::steal();
         let mut rcc = peripherals.RCC.constrain();
@@ -135,7 +135,7 @@ fn hard_fault(ef: &ExceptionFrame) -> ! {
 exception!(*, default_handler);
 
 fn default_handler(irqn: i16) {
-    /* steal() is not correct
+    /*
     cortex_m::interrupt::free(|_cs| unsafe {
         let peripherals = stm32f7x7::Peripherals::steal();
         let mut rcc = peripherals.RCC.constrain();
