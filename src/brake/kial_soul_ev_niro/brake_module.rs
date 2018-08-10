@@ -9,7 +9,7 @@ use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
 use kial_soul_ev::*;
-use nucleo_f767zi::can::{CanFrame, DataFrame};
+use nucleo_f767zi::hal::can::{CanFrame, DataFrame};
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;

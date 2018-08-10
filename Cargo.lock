@@ -68,11 +68,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "nucleo-f767zi"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#5a9eda16c95210ee65065bbd197969387a6be338"
+source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#6ea583dc59844f1e86a7bec1ab1d8e471d1ffd35"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "embedded_types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "stm32f767-hal 0.0.1 (git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel)",
 ]
@@ -168,11 +167,12 @@ dependencies = [
 [[package]]
 name = "stm32f767-hal"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#03b0651d00900fd29f05f622cbc5b355950a1e88"
+source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#aeeddceaa8402da084363171b01f83ff0aa0f28d"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embedded_types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "nb 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "stm32f7 0.2.2 (git+https://github.com/jonlamb-gh/stm32-rs.git?branch=stm32f767zit6-patches)",
  "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,5 +1,5 @@
 use board::ControlCan;
-use nucleo_f767zi::can::{BaseID, DataFrame, ID};
+use nucleo_f767zi::hal::can::{BaseID, DataFrame, ID};
 use oscc_magic_byte::*;
 
 pub const OSCC_STEERING_ENABLE_CAN_ID: u16 = 0x80;

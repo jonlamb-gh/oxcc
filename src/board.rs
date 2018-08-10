@@ -3,15 +3,15 @@ use core::fmt::Write;
 use cortex_m;
 use dac_mcp49xx::Mcp49xx;
 use ms_timer::MsTimer;
-use nucleo_f767zi::can::{Can1, Can2};
 use nucleo_f767zi::debug_console::DebugConsole;
+use nucleo_f767zi::hal::can::Can;
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, C_ADC};
 use nucleo_f767zi::led::Leds;
-use nucleo_f767zi::UserButton;
+use nucleo_f767zi::UserButtonPin;
 use sh::hio;
 
 // TODO - is this needed
@@ -34,7 +34,7 @@ pub struct Board {
     pub semihost_console: hio::HStdout,
     pub debug_console: DebugConsole,
     pub leds: Leds,
-    pub user_button: UserButton,
+    pub user_button: UserButtonPin,
     pub delay: Delay,
     pub timer_ms: MsTimer,
     pub can_publish_timer: CanPublishTimer,
@@ -68,7 +68,7 @@ impl Board {
         let mut adc3 = peripherals.ADC3;
         let mut c_adc = peripherals.C_ADC;
 
-        let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
+        let mut gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
         let mut gpioa = peripherals.GPIOA.split(&mut rcc.ahb1);
         let mut gpioc = peripherals.GPIOC.split(&mut rcc.ahb1);
         let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
@@ -113,8 +113,24 @@ impl Board {
                 .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
         };
 
+        let led_r = gpiob
+            .pb14
+            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
+        let led_g = gpiob
+            .pb7
+            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
+        let led_b = gpiob
+            .pb0
+            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
+
         let usart3_tx = gpiod.pd8.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
         let usart3_rx = gpiod.pd9.into_af7(&mut gpiod.moder, &mut gpiod.afrh);
+
+        let can1_tx = gpiod.pd1.into_af7(&mut gpiod.moder, &mut gpiod.afrl);
+        let can1_rx = gpiod.pd0.into_af7(&mut gpiod.moder, &mut gpiod.afrl);
+
+        let can2_tx = gpiob.pb13.into_af7(&mut gpiob.moder, &mut gpiob.afrh);
+        let can2_rx = gpiob.pb12.into_af7(&mut gpiob.moder, &mut gpiob.afrh);
 
         // default clock configuration runs at 16 MHz
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
@@ -142,9 +158,9 @@ impl Board {
             core_peripherals.DWT.lar.write(0xC5ACCE55);
         }
 
-        writeln!(semihost_console, "clocks = {:#?}", clocks);
+        //writeln!(semihost_console, "clocks = {:#?}", clocks);
 
-        let mut leds = Leds::new(gpiob);
+        let mut leds = Leds::new(led_r, led_g, led_b);
         for led in leds.iter_mut() {
             led.off();
         }
@@ -175,8 +191,8 @@ impl Board {
                 &mut rcc.apb1,
             ),
             dac: Mcp49xx::new(),
-            control_can: Can1::new(),
-            obd_can: Can2::new(),
+            control_can: Can::can1(peripherals.CAN1, (can1_tx, can1_rx), &mut rcc.apb1),
+            obd_can: Can::can2(peripherals.CAN2, (can2_tx, can2_rx), &mut rcc.apb1),
             adc1,
             adc3,
             brake_pins,
