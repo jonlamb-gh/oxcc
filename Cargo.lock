@@ -68,7 +68,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "nucleo-f767zi"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#081888034103c60e58702af09856bef2259b0b77"
+source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#5a9eda16c95210ee65065bbd197969387a6be338"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

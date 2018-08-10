@@ -161,7 +161,7 @@ impl Board {
             leds,
             user_button: gpioc
                 .pc13
-                .into_pull_up_input(&mut gpioc.moder, &mut gpioc.pupdr),
+                .into_pull_down_input(&mut gpioc.moder, &mut gpioc.pupdr),
             delay: Delay::new(core_peripherals.SYST, clocks),
             timer_ms: MsTimer::new(core_peripherals.DWT, clocks),
             can_publish_timer: CanPublishTimer::tim2(
@@ -182,7 +182,7 @@ impl Board {
     }
 
     pub fn user_button(&mut self) -> bool {
-        self.user_button.is_low()
+        self.user_button.is_high()
     }
 
     pub fn brake_spoof_enable(&mut self) -> &mut BrakeSpoofEnablePin {
