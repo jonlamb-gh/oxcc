@@ -96,6 +96,11 @@ fn main() -> ! {
 
         // TODO - do anything with the user button?
         if board.user_button() {
+            while board.user_button() {}
+
+            brake.enable_control(&mut board);
+            throttle.enable_control(&mut board);
+            steering.enable_control(&mut board);
             panic!("User button pressed");
         }
     }

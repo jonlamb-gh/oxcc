@@ -112,7 +112,7 @@ impl SteeringModule {
     }
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
-        if self.control_state.enabled && self.control_state.dtcs > 0 {
+        if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.read_torque_sensor(board);
 
             let unfiltered_diff = self.steering_torque.diff();

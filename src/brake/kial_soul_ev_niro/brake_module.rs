@@ -120,7 +120,7 @@ impl BrakeModule {
     }
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
-        if self.control_state.enabled && self.control_state.dtcs > 0 {
+        if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.read_brake_pedal_position_sensor(board);
 
             let brake_pedal_position_average = self.brake_pedal_position.average();

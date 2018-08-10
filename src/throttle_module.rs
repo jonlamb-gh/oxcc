@@ -112,7 +112,7 @@ impl ThrottleModule {
     }
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
-        if self.control_state.enabled && self.control_state.dtcs > 0 {
+        if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.read_accelerator_position_sensor(board);
 
             let accelerator_position_average = self.accelerator_position.average();
