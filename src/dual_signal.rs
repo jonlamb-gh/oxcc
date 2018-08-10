@@ -21,8 +21,8 @@ impl DualSignal {
     }
 
     pub fn update(&mut self, board: &mut Board) {
-        self.high = board.anolog_read(self.high_signal, ADC_SAMPLE_TIME);
-        self.low = board.anolog_read(self.low_signal, ADC_SAMPLE_TIME);
+        self.high = board.analog_read(self.high_signal, ADC_SAMPLE_TIME);
+        self.low = board.analog_read(self.low_signal, ADC_SAMPLE_TIME);
     }
 
     // not sure if the averaging is needed, we might be able to just use a
@@ -33,11 +33,11 @@ impl DualSignal {
         let mut high: u32 = 0;
 
         for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            low += board.anolog_read(self.low_signal, ADC_SAMPLE_TIME) as u32;
+            low += board.analog_read(self.low_signal, ADC_SAMPLE_TIME) as u32;
         }
 
         for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            high += board.anolog_read(self.high_signal, ADC_SAMPLE_TIME) as u32;
+            high += board.analog_read(self.high_signal, ADC_SAMPLE_TIME) as u32;
         }
 
         self.low = (low / DAC_SAMPLE_AVERAGE_COUNT) as _;

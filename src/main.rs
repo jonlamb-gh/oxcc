@@ -41,6 +41,7 @@ mod throttle_can_protocol;
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;
 
+use adc_signal::{AdcSampleTime, AdcSignal};
 use board::Board;
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
@@ -92,16 +93,22 @@ fn main() -> ! {
             brake.publish_brake_report(&mut board);
             throttle.publish_throttle_report(&mut board);
             steering.publish_steering_report(&mut board);
+
+            //writeln!(board.debug_console, "{}", board.timer_ms.ms());
         }
 
         // TODO - do anything with the user button?
         if board.user_button() {
-            while board.user_button() {}
+            let val1 = board.analog_read(AdcSignal::TorqueSensorHigh, AdcSampleTime::Cycles480);
+            let val2 = board.analog_read(AdcSignal::TorqueSensorLow, AdcSampleTime::Cycles480);
 
-            brake.enable_control(&mut board);
-            throttle.enable_control(&mut board);
-            steering.enable_control(&mut board);
-            panic!("User button pressed");
+            writeln!(board.debug_console, "{} {}", val1, val2);
+
+            //while board.user_button() {}
+            //brake.enable_control(&mut board);
+            //throttle.enable_control(&mut board);
+            //steering.enable_control(&mut board);
+            //panic!("User button pressed");
         }
     }
 }

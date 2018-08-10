@@ -9,7 +9,7 @@ use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
-use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, C_ADC, RCC};
+use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, C_ADC};
 use nucleo_f767zi::led::Leds;
 use nucleo_f767zi::UserButton;
 use sh::hio;
@@ -119,10 +119,16 @@ impl Board {
         // default clock configuration runs at 16 MHz
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
         //
-        // TODO - alternate clock configuration, breaks delay currently
+        // TODO - alternate clock configuration, breaks delay/timers/etc currently
         // need to check timer impl as well with this change
-        //let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut
-        // flash.acr);
+        /*
+        let clocks = rcc.cfgr
+            .sysclk(64.mhz())
+            .hclk(64.mhz())
+            .pclk1(16.mhz())
+            .pclk2(32.mhz())
+            .freeze(&mut flash.acr);
+        */
 
         // TODO - need to push this down into the HAL in order to access
         // the constained RCC periphals
@@ -136,9 +142,7 @@ impl Board {
             core_peripherals.DWT.lar.write(0xC5ACCE55);
         }
 
-        writeln!(semihost_console, "sysclk = {} Hz", clocks.sysclk().0);
-        writeln!(semihost_console, "pclk1 = {} Hz", clocks.pclk1().0);
-        writeln!(semihost_console, "pclk2 = {} Hz", clocks.pclk2().0);
+        writeln!(semihost_console, "clocks = {:#?}", clocks);
 
         let mut leds = Leds::new(gpiob);
         for led in leds.iter_mut() {
@@ -209,7 +213,7 @@ impl Board {
         &mut self.obd_can
     }
 
-    pub fn anolog_read(&mut self, signal: AdcSignal, sample_time: AdcSampleTime) -> u16 {
+    pub fn analog_read(&mut self, signal: AdcSignal, sample_time: AdcSampleTime) -> u16 {
         match signal {
             AdcSignal::AcceleratorPositionSensorHigh => self.adc1_read(signal, sample_time),
             AdcSignal::AcceleratorPositionSensorLow => self.adc1_read(signal, sample_time),
@@ -302,20 +306,10 @@ impl Board {
 // - DMA would be nice, to enable sequencing
 // - can I iterate adc in (adc1, adc2, adc3) to reduce duplications?
 fn init_adc(c_adc: &mut C_ADC, adc1: &mut ADC1, adc2: &mut ADC2, adc3: &mut ADC3) {
-    let rcc = unsafe { &*RCC::ptr() };
-
-    // ADC reset and release
-    rcc.apb2rstr.modify(|_, w| w.adcrst().set_bit());
-    rcc.apb2rstr.modify(|_, w| w.adcrst().clear_bit());
-
     // stop conversions while being configured
     adc1.cr2.modify(|_, w| w.swstart().clear_bit());
     adc2.cr2.modify(|_, w| w.swstart().clear_bit());
     adc3.cr2.modify(|_, w| w.swstart().clear_bit());
-
-    // enable ADC1/2/3 peripheral clocks
-    rcc.apb2enr
-        .modify(|_, w| w.adc1en().set_bit().adc2en().set_bit().adc3en().set_bit());
 
     // TODO - need to update this once RCC is updated
     // set ADC prescaler, PCLK2 divided by 4
