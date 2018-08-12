@@ -4,7 +4,7 @@ use cortex_m;
 use dac_mcp49xx::Mcp49xx;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
-use nucleo_f767zi::hal::can::Can;
+use nucleo_f767zi::hal::can::{Can, CanFilterConfig, CanSettings};
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
@@ -14,7 +14,6 @@ use nucleo_f767zi::led::Leds;
 use nucleo_f767zi::UserButtonPin;
 use sh::hio;
 
-// TODO - is this needed
 pub use types::*;
 
 // feature to pick how to route up debug_println/println?
@@ -145,7 +144,7 @@ impl Board {
             .pclk2(32.mhz())
             .freeze(&mut flash.acr);
         */
-        
+
         //writeln!(semihost_console, "clocks = {:#?}", clocks);
 
         // TODO - need to push this down into the HAL in order to access
@@ -175,6 +174,15 @@ impl Board {
             &mut rcc.apb1,
         );
 
+        let control_can = Can::can1(
+            peripherals.CAN1,
+            (can1_tx, can1_rx),
+            &mut rcc.apb1,
+            &CanSettings::default(),
+        );
+
+        control_can.configure_filter(&CanFilterConfig::default());
+
         Board {
             semihost_console,
             debug_console: DebugConsole::new(serial),
@@ -191,7 +199,16 @@ impl Board {
                 &mut rcc.apb1,
             ),
             dac: Mcp49xx::new(),
-            control_can: Can::can1(peripherals.CAN1, (can1_tx, can1_rx), &mut rcc.apb1),
+            control_can,
+            /*
+            control_can: Can::can1(
+                peripherals.CAN1,
+                (can1_tx, can1_rx),
+                &mut rcc.apb1,
+                &CanSettings::default(),
+            ),
+            */
+            // NOTE: CAN2 is just mocked up for now
             obd_can: Can::can2(peripherals.CAN2, (can2_tx, can2_rx), &mut rcc.apb1),
             adc1,
             adc3,

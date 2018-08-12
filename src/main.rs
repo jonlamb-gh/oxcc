@@ -73,6 +73,11 @@ fn main() -> ! {
     steering.init_devices(&mut board);
     can_gateway.init_devices(&mut board);
 
+    // send reports immediately
+    brake.publish_brake_report(&mut board);
+    throttle.publish_throttle_report(&mut board);
+    steering.publish_steering_report(&mut board);
+
     loop {
         brake.check_for_incoming_message(&mut board);
         throttle.check_for_incoming_message(&mut board);
