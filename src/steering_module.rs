@@ -7,7 +7,7 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
-use nucleo_f767zi::hal::can::{CanFrame, DataFrame};
+use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
@@ -185,30 +185,22 @@ impl SteeringModule {
     }
 
     // TODO - error handling
-    pub fn check_for_incoming_message(&mut self, board: &mut Board) {
-        if let Ok(rx_frame) = board.control_can().receive() {
-            if let CanFrame::DataFrame(ref f) = rx_frame {
-                self.process_rx_frame(f, board);
+    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, board: &mut Board) {
+        if let CanFrame::DataFrame(ref frame) = can_frame {
+            let id: u32 = frame.id().into();
+            let data = frame.data();
+
+            if (data[0] == OSCC_MAGIC_BYTE_0) && (data[1] == OSCC_MAGIC_BYTE_1) {
+                if id == OSCC_STEERING_ENABLE_CAN_ID.into() {
+                    self.enable_control(board);
+                } else if id == OSCC_STEERING_DISABLE_CAN_ID.into() {
+                    self.disable_control(board);
+                } else if id == OSCC_STEERING_COMMAND_CAN_ID.into() {
+                    self.process_steering_command(&OsccSteeringCommand::from(frame), board);
+                } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
+                    self.process_fault_report(&OsccFaultReport::from(frame), board);
+                }
             }
-        }
-    }
-
-    // TODO - error handling
-    pub fn process_rx_frame(&mut self, frame: &DataFrame, board: &mut Board) {
-        let id: u32 = frame.id().into();
-        let data = frame.data();
-
-        assert_eq!(data[0], OSCC_MAGIC_BYTE_0);
-        assert_eq!(data[1], OSCC_MAGIC_BYTE_1);
-
-        if id == OSCC_STEERING_ENABLE_CAN_ID.into() {
-            self.enable_control(board);
-        } else if id == OSCC_STEERING_DISABLE_CAN_ID.into() {
-            self.disable_control(board);
-        } else if id == OSCC_STEERING_COMMAND_CAN_ID.into() {
-            self.process_steering_command(&OsccSteeringCommand::from(frame), board);
-        } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
-            self.process_fault_report(&OsccFaultReport::from(frame), board);
         }
     }
 

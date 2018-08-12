@@ -4,7 +4,7 @@ use cortex_m;
 use dac_mcp49xx::Mcp49xx;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
-use nucleo_f767zi::hal::can::{Can, CanFilterConfig, CanSettings};
+use nucleo_f767zi::hal::can::{Can, CanConfig, CanFilterConfig};
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
@@ -178,10 +178,15 @@ impl Board {
             peripherals.CAN1,
             (can1_tx, can1_rx),
             &mut rcc.apb1,
-            &CanSettings::default(),
-        );
+            // NOTE: the default config can fail if there are CAN bus or config issues
+            &CanConfig::default(),
+            /* loopback/silent mode can be used for testing */
+            /* &CanConfig { loopback_mode: true, silent_mode: true, ..CanConfig::default() }, */
+        ).expect("Failed to configure Control CAN (CAN1)");
 
-        control_can.configure_filter(&CanFilterConfig::default());
+        control_can
+            .configure_filter(&CanFilterConfig::default())
+            .expect("Failed to configure Control CAN filters");
 
         Board {
             semihost_console,

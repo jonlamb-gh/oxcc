@@ -46,6 +46,7 @@ use board::Board;
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
+use nucleo_f767zi::hal::can::RxFifo;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
@@ -79,14 +80,19 @@ fn main() -> ! {
     steering.publish_steering_report(&mut board);
 
     loop {
-        brake.check_for_incoming_message(&mut board);
-        throttle.check_for_incoming_message(&mut board);
-        steering.check_for_incoming_message(&mut board);
+        for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
+            if let Ok(rx_frame) = board.control_can().receive(fifo) {
+                brake.process_rx_frame(&rx_frame, &mut board);
+                throttle.process_rx_frame(&rx_frame, &mut board);
+                steering.process_rx_frame(&rx_frame, &mut board);
+            }
+        }
 
         brake.check_for_faults(&mut board);
         throttle.check_for_faults(&mut board);
         steering.check_for_faults(&mut board);
 
+        // TODO - update this when CAN2 is available
         can_gateway.republish_obd_frames_to_control_can_bus(&mut board);
 
         // TODO - just polling the publish timer for now
