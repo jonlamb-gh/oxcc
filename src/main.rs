@@ -83,11 +83,6 @@ fn main() -> ! {
         // poll both control CAN FIFOs
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
             if let Ok(rx_frame) = board.control_can().receive(fifo) {
-                writeln!(
-                    board.debug_console,
-                    "CAN Rx 0x{:X}",
-                    u32::from(rx_frame.id())
-                );
                 brake.process_rx_frame(&rx_frame, &mut board);
                 throttle.process_rx_frame(&rx_frame, &mut board);
                 steering.process_rx_frame(&rx_frame, &mut board);
@@ -101,11 +96,6 @@ fn main() -> ! {
         // poll both OBD CAN FIFOs
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
             if let Ok(rx_frame) = board.obd_can().receive(fifo) {
-                writeln!(
-                    board.debug_console,
-                    "OBD Rx 0x{:X}",
-                    u32::from(rx_frame.id())
-                );
                 can_gateway.republish_obd_frame_to_control_can_bus(&rx_frame, &mut board);
             }
         }
