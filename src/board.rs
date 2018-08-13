@@ -1,10 +1,11 @@
 use adc_signal::{AdcChannel, AdcSampleTime, AdcSignal};
+use config;
 use core::fmt::Write;
 use cortex_m;
 use dac_mcp49xx::Mcp49xx;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
-use nucleo_f767zi::hal::can::{Can, CanConfig, CanFilterConfig};
+use nucleo_f767zi::hal::can::{Can, CanConfig};
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
@@ -184,9 +185,12 @@ impl Board {
             /* &CanConfig { loopback_mode: true, silent_mode: true, ..CanConfig::default() }, */
         ).expect("Failed to configure Control CAN (CAN1)");
 
-        control_can
-            .configure_filter(&CanFilterConfig::default())
-            .expect("Failed to configure Control CAN filters");
+        // apply control CAN filters
+        for filter in config::gather_control_can_filters().iter() {
+            control_can
+                .configure_filter(&filter)
+                .expect("Failed to configure CAN filter");
+        }
 
         Board {
             semihost_console,

@@ -13,6 +13,7 @@ extern crate panic_semihosting;
 mod adc_signal;
 mod board;
 mod can_gateway_module;
+mod config;
 mod dac_mcp49xx;
 mod dtc;
 mod dual_signal;
