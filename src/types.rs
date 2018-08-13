@@ -1,12 +1,13 @@
 use nucleo_f767zi::hal::can::Can;
-use nucleo_f767zi::hal::gpio::gpioa::PA3;
 use nucleo_f767zi::hal::gpio::gpiob::{PB12, PB13};
-use nucleo_f767zi::hal::gpio::gpioc::{PC0, PC3};
 use nucleo_f767zi::hal::gpio::gpiod::{PD0, PD1, PD10, PD11, PD12, PD13};
-use nucleo_f767zi::hal::gpio::gpiof::{PF10, PF3, PF5};
-use nucleo_f767zi::hal::gpio::{AF9, Analog, Input, Output, PushPull};
+use nucleo_f767zi::hal::gpio::{AF9, Output, PushPull};
 use nucleo_f767zi::hal::stm32f7x7::{CAN1, CAN2, TIM2};
 use nucleo_f767zi::hal::timer::Timer;
+use nucleo_f767zi::{
+    AnalogInput0Pin, AnalogInput1Pin, AnalogInput2Pin, AnalogInput3Pin, AnalogInput4Pin,
+    AnalogInput5Pin,
+};
 
 pub type CanPublishTimer = Timer<TIM2>;
 
@@ -15,16 +16,16 @@ pub type ObdCan = Can<CAN2, (PB13<AF9>, PB12<AF9>)>;
 
 pub type BrakeSpoofEnablePin = PD12<Output<PushPull>>;
 pub type BrakeLightEnablePin = PD13<Output<PushPull>>;
-pub type BrakePedalPositionSensorHighPin = PF5<Input<Analog>>; // ADC3_IN15
-pub type BrakePedalPositionSensorLowPin = PF10<Input<Analog>>; // ADC3_IN8
+pub type BrakePedalPositionSensorHighPin = AnalogInput4Pin;
+pub type BrakePedalPositionSensorLowPin = AnalogInput5Pin;
 
 pub type ThrottleSpoofEnablePin = PD10<Output<PushPull>>;
-pub type AcceleratorPositionSensorHighPin = PA3<Input<Analog>>; // ADC123_IN3
-pub type AcceleratorPositionSensorLowPin = PC0<Input<Analog>>; // ADC123_IN10
+pub type AcceleratorPositionSensorHighPin = AnalogInput0Pin;
+pub type AcceleratorPositionSensorLowPin = AnalogInput1Pin;
 
 pub type SteeringSpoofEnablePin = PD11<Output<PushPull>>;
-pub type TorqueSensorHighPin = PC3<Input<Analog>>; // ADC123_IN13
-pub type TorqueSensorLowPin = PF3<Input<Analog>>; // ADC3_IN9
+pub type TorqueSensorHighPin = AnalogInput2Pin;
+pub type TorqueSensorLowPin = AnalogInput3Pin;
 
 pub struct BrakePins {
     pub spoof_enable: BrakeSpoofEnablePin,
