@@ -11,7 +11,7 @@ use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, C_ADC};
-use nucleo_f767zi::led::Leds;
+use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
 use sh::hio;
 
@@ -179,17 +179,34 @@ impl Board {
             peripherals.CAN1,
             (can1_tx, can1_rx),
             &mut rcc.apb1,
-            // NOTE: the default config can fail if there are CAN bus or config issues
+            /* NOTE: the default config can fail if there are CAN bus or config issues */
             &CanConfig::default(),
             /* loopback/silent mode can be used for testing */
             /* &CanConfig { loopback_mode: true, silent_mode: true, ..CanConfig::default() }, */
-        ).expect("Failed to configure Control CAN (CAN1)");
+        ).expect("Failed to configure ontrol CAN (CAN1)");
+
+        let obd_can = Can::can2(
+            peripherals.CAN2,
+            (can2_tx, can2_rx),
+            &mut rcc.apb1,
+            /* NOTE: the default config can fail if there are CAN bus or config issues */
+            &CanConfig::default(),
+            /* loopback/silent mode can be used for testing */
+            /* &CanConfig { loopback_mode: true, silent_mode: true, ..CanConfig::default() }, */
+        ).expect("Failed to configure OBD CAN (CAN2)");
 
         // apply control CAN filters
         for filter in config::gather_control_can_filters().iter() {
             control_can
                 .configure_filter(&filter)
-                .expect("Failed to configure CAN filter");
+                .expect("Failed to configure control CAN filter");
+        }
+
+        // apply OBD CAN filters
+        for filter in config::gather_obd_can_filters().iter() {
+            obd_can
+                .configure_filter(&filter)
+                .expect("Failed to configure OBD CAN filter");
         }
 
         Board {
@@ -209,8 +226,7 @@ impl Board {
             ),
             dac: Mcp49xx::new(),
             control_can,
-            // NOTE: CAN2 is just mocked up for now
-            obd_can: Can::can2(peripherals.CAN2, (can2_tx, can2_rx), &mut rcc.apb1),
+            obd_can,
             adc1,
             adc3,
             brake_pins,
@@ -333,6 +349,27 @@ impl Board {
 
         self.adc3.dr.read().data().bits()
     }
+}
+
+pub fn hard_fault_indicator() {
+    cortex_m::interrupt::free(|_cs| unsafe {
+        let peripherals = stm32f7x7::Peripherals::steal();
+        let mut rcc = peripherals.RCC.constrain();
+        let mut gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
+
+        let led_r = gpiob
+            .pb14
+            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
+        let led_g = gpiob
+            .pb0
+            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
+        let led_b = gpiob
+            .pb7
+            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
+
+        let mut leds = Leds::new(led_r, led_g, led_b);
+        leds[Color::Red].on();
+    });
 }
 
 // TODOs

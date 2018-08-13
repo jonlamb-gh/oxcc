@@ -42,8 +42,7 @@ mod throttle_can_protocol;
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;
 
-use adc_signal::{AdcSampleTime, AdcSignal};
-use board::Board;
+use board::{hard_fault_indicator, Board};
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
@@ -61,9 +60,9 @@ fn main() -> ! {
     // mutable let Board {mut leds, mut delay, ..} = Board::new();
     let mut board = Board::new();
 
-    // TODO - just for testing
-    writeln!(board.debug_console, "oxcc is running");
+    // turn on the blue LED
     board.leds[led::Color::Blue].on();
+    writeln!(board.debug_console, "oxcc is running");
 
     let mut brake = BrakeModule::new();
     let mut throttle = ThrottleModule::new();
@@ -81,8 +80,14 @@ fn main() -> ! {
     steering.publish_steering_report(&mut board);
 
     loop {
+        // poll both control CAN FIFOs
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
             if let Ok(rx_frame) = board.control_can().receive(fifo) {
+                writeln!(
+                    board.debug_console,
+                    "CAN Rx 0x{:X}",
+                    u32::from(rx_frame.id())
+                );
                 brake.process_rx_frame(&rx_frame, &mut board);
                 throttle.process_rx_frame(&rx_frame, &mut board);
                 steering.process_rx_frame(&rx_frame, &mut board);
@@ -93,8 +98,17 @@ fn main() -> ! {
         throttle.check_for_faults(&mut board);
         steering.check_for_faults(&mut board);
 
-        // TODO - update this when CAN2 is available
-        can_gateway.republish_obd_frames_to_control_can_bus(&mut board);
+        // poll both OBD CAN FIFOs
+        for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
+            if let Ok(rx_frame) = board.obd_can().receive(fifo) {
+                writeln!(
+                    board.debug_console,
+                    "OBD Rx 0x{:X}",
+                    u32::from(rx_frame.id())
+                );
+                can_gateway.republish_obd_frame_to_control_can_bus(&rx_frame, &mut board);
+            }
+        }
 
         // TODO - just polling the publish timer for now
         // we can also drive this logic from the interrupt
@@ -111,16 +125,7 @@ fn main() -> ! {
 
         // TODO - do anything with the user button?
         if board.user_button() {
-            let val1 = board.analog_read(AdcSignal::TorqueSensorHigh, AdcSampleTime::Cycles480);
-            let val2 = board.analog_read(AdcSignal::TorqueSensorLow, AdcSampleTime::Cycles480);
-
-            writeln!(board.debug_console, "{} {}", val1, val2);
-
-            //while board.user_button() {}
-            //brake.enable_control(&mut board);
-            //throttle.enable_control(&mut board);
-            //steering.enable_control(&mut board);
-            //panic!("User button pressed");
+            cortex_m::asm::bkpt();
         }
     }
 }
@@ -130,33 +135,13 @@ exception!(HardFault, hard_fault);
 // TODO - any safety related things we can do in these contexts (disable
 // controls, LEDs, etc)?
 fn hard_fault(ef: &ExceptionFrame) -> ! {
-    /*
-    cortex_m::interrupt::free(|_cs| unsafe {
-        let peripherals = stm32f7x7::Peripherals::steal();
-        let mut rcc = peripherals.RCC.constrain();
-        let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
-
-        let mut leds = led::Leds::new(gpiob);
-        leds[led::Color::Red].on();
-    });
-    */
-
+    hard_fault_indicator();
     panic!("HardFault at {:#?}", ef);
 }
 
 exception!(*, default_handler);
 
 fn default_handler(irqn: i16) {
-    /*
-    cortex_m::interrupt::free(|_cs| unsafe {
-        let peripherals = stm32f7x7::Peripherals::steal();
-        let mut rcc = peripherals.RCC.constrain();
-        let gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
-
-        let mut leds = led::Leds::new(gpiob);
-        leds[led::Color::Red].on();
-    });
-    */
-
+    hard_fault_indicator();
     panic!("Unhandled exception (IRQn = {})", irqn);
 }
