@@ -209,14 +209,6 @@ impl Board {
             ),
             dac: Mcp49xx::new(),
             control_can,
-            /*
-            control_can: Can::can1(
-                peripherals.CAN1,
-                (can1_tx, can1_rx),
-                &mut rcc.apb1,
-                &CanSettings::default(),
-            ),
-            */
             // NOTE: CAN2 is just mocked up for now
             obd_can: Can::can2(peripherals.CAN2, (can2_tx, can2_rx), &mut rcc.apb1),
             adc1,
