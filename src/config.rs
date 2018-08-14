@@ -3,9 +3,7 @@ use fault_can_protocol::*;
 use nucleo_f767zi::hal::can::{CanFilterConfig, FilterMode, FilterScale, RxFifo};
 use steering_can_protocol::*;
 use throttle_can_protocol::*;
-
-// TODO feature gate vehicles
-use kial_soul_ev::*;
+use vehicle::*;
 
 // TODO - docs on priority ordering in ID list mode
 // can we make a pub type instead?

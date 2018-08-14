@@ -1,4 +1,4 @@
-//https://github.com/jonlamb-gh/oscc/blob/master/api/include/vehicles/kia_soul_ev.h
+//https://github.com/jonlamb-gh/oscc/blob/devel/include/vehicles/kia_soul_ev.h
 
 pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185;
 

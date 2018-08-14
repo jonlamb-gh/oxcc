@@ -12,9 +12,7 @@ use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
 use throttle_can_protocol::*;
-
-// TODO feature gate vehicles
-use kial_soul_ev::*;
+use vehicle::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
 

@@ -8,11 +8,11 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
-use kial_soul_ev::*;
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
+use vehicle::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
 

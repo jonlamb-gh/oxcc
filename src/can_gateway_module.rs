@@ -2,9 +2,7 @@
 
 use board::Board;
 use nucleo_f767zi::hal::can::CanFrame;
-
-// TODO feature gate vehicles
-use kial_soul_ev::*;
+use vehicle::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
 

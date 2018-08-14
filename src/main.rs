@@ -38,9 +38,16 @@ mod steering_can_protocol;
 #[path = "can_protocols/throttle_can_protocol.rs"]
 mod throttle_can_protocol;
 
-// TODO - feature gate this as vehicle
+#[cfg(feature = "kia-soul-ev")]
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;
+#[cfg(feature = "kia-soul-niro")]
+#[path = "vehicles/kial_soul_niro.rs"]
+mod kial_soul_niro;
+#[cfg(feature = "kia-soul-petrol")]
+#[path = "vehicles/kial_soul_petrol.rs"]
+mod kial_soul_petrol;
+mod vehicle;
 
 use board::{hard_fault_indicator, Board};
 use brake_module::BrakeModule;
