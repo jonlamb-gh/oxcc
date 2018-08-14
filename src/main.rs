@@ -5,9 +5,13 @@
 extern crate cortex_m;
 #[macro_use]
 extern crate cortex_m_rt as rt;
-extern crate cortex_m_semihosting as sh;
+#[cfg(feature = "panic-over-semihosting")]
+extern crate cortex_m_semihosting;
 extern crate nucleo_f767zi;
 extern crate num;
+#[cfg(feature = "panic-over-abort")]
+extern crate panic_abort;
+#[cfg(feature = "panic-over-semihosting")]
 extern crate panic_semihosting;
 
 mod adc_signal;
@@ -72,7 +76,7 @@ fn main() -> ! {
 
     // turn on the blue LED
     board.leds[led::Color::Blue].on();
-    writeln!(board.debug_console, "oxcc is running");
+    writeln!(board.debug_console, "oxcc is running").unwrap();
 
     let mut brake = BrakeModule::new();
     let mut throttle = ThrottleModule::new();
@@ -125,6 +129,8 @@ fn main() -> ! {
 
         // TODO - do anything with the user button?
         if board.user_button() {
+            // can only do this when we're debugging/semihosting
+            #[cfg(feature = "panic-over-semihosting")]
             cortex_m::asm::bkpt();
         }
     }

@@ -1,6 +1,5 @@
 use adc_signal::AdcSignal;
 use config;
-use core::fmt::Write;
 use cortex_m;
 use dac_mcp49xx::Mcp49xx;
 use ms_timer::MsTimer;
@@ -14,7 +13,6 @@ use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC3};
 use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
-use sh::hio;
 
 pub use types::*;
 
@@ -32,7 +30,7 @@ pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
 pub const DAC_SAMPLE_AVERAGE_COUNT: u32 = 20;
 
 pub struct Board {
-    pub semihost_console: hio::HStdout,
+    //pub semihost_console: hio::HStdout,
     pub debug_console: DebugConsole,
     pub leds: Leds,
     pub user_button: UserButtonPin,
@@ -51,9 +49,6 @@ pub struct Board {
 
 impl Board {
     pub fn new() -> Self {
-        let mut semihost_console = hio::hstdout().unwrap();
-        writeln!(semihost_console, "System starting");
-
         let mut core_peripherals = cortex_m::Peripherals::take().unwrap();
         let peripherals = stm32f7x7::Peripherals::take().unwrap();
 
@@ -203,7 +198,6 @@ impl Board {
         }
 
         Board {
-            semihost_console,
             debug_console: DebugConsole::new(serial),
             leds,
             user_button: gpioc
