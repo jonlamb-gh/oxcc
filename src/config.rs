@@ -68,7 +68,10 @@ pub fn gather_obd_can_filters() -> [CanFilterConfig; 1] {
     f3.filter_mask_id_low = (KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID << 5) as _;
     f3.filter_id_low = (KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID << 5) as _;
     f3.filter_mask_id_high = (KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID << 5) as _;
-    f3.filter_id_high = (KIA_SOUL_OBD_THROTTLE_PRESSURE_CAN_ID << 5) as _;
+    #[cfg(feature = "kia-soul-ev")]
+    {
+        f3.filter_id_high = (KIA_SOUL_OBD_THROTTLE_PRESSURE_CAN_ID << 5) as _;
+    }
 
     [f3]
 }

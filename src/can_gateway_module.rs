@@ -18,12 +18,23 @@ impl CanGatewayModule {
     // TODO - error handling
     pub fn republish_obd_frame_to_control_can_bus(&mut self, frame: &CanFrame, board: &mut Board) {
         let id: u32 = frame.id().into();
+        let mut is_a_match = false;
 
         if (id == KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID.into())
             || (id == KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID.into())
             || (id == KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID.into())
-            || (id == KIA_SOUL_OBD_THROTTLE_PRESSURE_CAN_ID.into())
         {
+            is_a_match = true;
+        }
+
+        #[cfg(feature = "kia-soul-ev")]
+        {
+            if id == KIA_SOUL_OBD_THROTTLE_PRESSURE_CAN_ID.into() {
+                is_a_match = true;
+            }
+        }
+
+        if is_a_match {
             if let Err(_) = board.control_can().transmit(&frame) {
                 // TODO - error handling
             }

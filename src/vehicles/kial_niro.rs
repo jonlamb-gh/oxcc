@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-/// Kia Soul Petrol
+/// Kia Niro
 
 // ********************************************************************
 //
@@ -21,22 +21,28 @@
 // ****************************************************************************
 
 /*
- * @brief ID of the Kia Soul's OBD steering wheel angle CAN frame. */
+ * @brief ID of the Kia Niro's OBD steering wheel angle CAN frame. */
 //
 //
 pub const KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID: u16 = 0x2B0;
 
 /*
- * @brief ID of the Kia Soul's OBD wheel speed CAN frame. */
+ * @brief ID of the Kia Niro's OBD wheel speed CAN frame. */
 //
 //
-pub const KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID: u16 = 0x4B0;
+pub const KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID: u16 = 0x386;
 
 /*
- * @brief ID of the Kia Soul's OBD brake pressure CAN frame. */
+ * @brief ID of the Kia Niro's OBD brake pressure CAN frame. */
 //
 //
 pub const KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID: u16 = 0x220;
+
+/*
+ * @brief ID of the Kia Niro's OBD speed CAN frame. */
+//
+//
+pub const KIA_SOUL_OBD_SPEED_CAN_ID: u16 = 0x371;
 
 /*
  * @brief Factor to scale OBD steering angle to degrees */
@@ -60,7 +66,7 @@ pub const STEPS_PER_VOLT: f32 = 819.2;
  * outside the range of noise in the signal. */
 //
 //
-pub const FAULT_HYSTERESIS: u32 = 100;
+pub const FAULT_HYSTERESIS: u32 = 150;
 
 // ****************************************************************************
 // BRAKE MODULE
@@ -79,163 +85,95 @@ pub const MINIMUM_BRAKE_COMMAND: f32 = 0.0;
 pub const MAXIMUM_BRAKE_COMMAND: f32 = 1.0;
 
 /*
- * @brief Calculation to convert a brake position to a pedal position. */
+ * @brief Minimum allowed voltage for the high spoof signal voltage. [volts] */
 //
 //
-pub const fn brake_position_to_pedal(position: f32) -> f32 {
-    position
+pub const BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN: f32 = 0.609;
+
+/*
+ * @brief Maximum allowed voltage for the high spoof signal voltage. [volts] */
+//
+//
+pub const BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX: f32 = 2.880;
+
+/*
+ * @brief Minimum allowed voltage for the low spoof signal voltage. [volts] */
+//
+//
+pub const BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN: f32 = 0.279;
+
+/*
+ * @brief Maximum allowed voltage for the low spoof signal voltage. [volts] */
+//
+//
+pub const BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX: f32 = 1.386;
+
+/*
+ * @brief Minimum allowed value for the high spoof signal value. [steps] */
+//
+// Equal to \ref BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN * \ref STEPS_PER_VOLT.
+//
+pub const BRAKE_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 499;
+
+/*
+ * @brief Minimum allowed value for the high spoof signal value. [steps] */
+//
+// Equal to \ref BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
+//
+pub const BRAKE_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 2359;
+
+/*
+ * @brief Minimum allowed value for the low spoof signal value. [steps] */
+//
+// Equal to \ref BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN * \ref STEPS_PER_VOLT.
+//
+pub const BRAKE_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 229;
+
+/*
+ * @brief Minimum allowed value for the low spoof signal value. [steps] */
+//
+// Equal to \ref BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
+//
+pub const BRAKE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 1135;
+
+/*
+ * @brief Calculation to convert a brake position to a low spoof voltage. */
+//
+//
+pub const fn brake_position_to_volts_low(position: f32) -> f32 {
+    position * (BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX - BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN)
+        + BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN
 }
 
 /*
- * @brief Calculation to convert a brake pressure to a pedal position. */
+ * @brief Calculation to convert a brake position to a high spoof voltage. */
 //
 //
-pub const fn brake_pressure_to_pedal(pressure: f32) -> f32 {
-    pressure
+pub const fn brake_position_to_volts_high(position: f32) -> f32 {
+    position * (BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX - BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN)
+        + BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
 }
 
 /*
- * @brief Minimum accumulator presure. [decibars] */
+ * @brief Value of the accelerator position that indicates operator
+ * override. [steps] */
 //
 //
-pub const BRAKE_ACCUMULATOR_PRESSURE_MIN_IN_DECIBARS: f32 = 777.6;
+pub const BRAKE_PEDAL_OVERRIDE_THRESHOLD: u16 = 200;
 
 /*
- * @brief Maximum accumulator pressure. [decibars] */
+ * @brief Minimum value of the high spoof signal that activates the brake
+ * lights. [steps] */
 //
 //
-pub const BRAKE_ACCUMULATOR_PRESSURE_MAX_IN_DECIBARS: f32 = 878.0;
+pub const BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD: u16 = 300;
 
 /*
- * @brief Value of brake pressure that indicates operator override.
- * [decibars] */
+ * @brief Minimum value of the low spoof signal that activates the brake
+ * lights. [steps] */
 //
 //
-pub const BRAKE_OVERRIDE_PEDAL_THRESHOLD_IN_DECIBARS: f32 = 43.2;
-
-/*
- * @brief Brake pressure threshold for when to enable the brake light. */
-//
-//
-pub const BRAKE_LIGHT_PRESSURE_THRESHOLD_IN_DECIBARS: f32 = 20.0;
-
-/*
- * @brief Minimum possible pressure of brake system. [decibars] */
-//
-//
-pub const BRAKE_PRESSURE_MIN_IN_DECIBARS: f32 = 12.0;
-
-/*
- * @brief Maximum possible pressure of brake system. [decibars] */
-//
-//
-pub const BRAKE_PRESSURE_MAX_IN_DECIBARS: f32 = 878.3;
-
-/*
- * @brief Minimum possible value expected to be read from the brake pressure
- * sensors when the pressure check pins (PCK1/PCK2) are asserted. */
-//
-//
-pub const BRAKE_PRESSURE_SENSOR_CHECK_VALUE_MIN: u16 = 665;
-
-/*
- * @brief Maximum possible value expected to be read from the brake pressure
- * sensors when the pressure check pins (PCK1/PCK2) are asserted. */
-//
-//
-pub const BRAKE_PRESSURE_SENSOR_CHECK_VALUE_MAX: u16 = 680;
-
-/*
- * @brief Proportional gain of the PID controller. */
-//
-//
-pub const BRAKE_PID_PROPORTIONAL_GAIN: f32 = 0.65;
-
-/*
- * @brief Integral gain of the PID controller. */
-//
-//
-pub const BRAKE_PID_INTEGRAL_GAIN: f32 = 1.75;
-
-/*
- * @brief Derivative gain of the PID controller. */
-//
-//
-pub const BRAKE_PID_DERIVATIVE_GAIN: f32 = 0.000;
-
-/*
- * @brief Windup guard of the PID controller. */
-//
-//
-pub const BRAKE_PID_WINDUP_GUARD: f32 = 30.0;
-
-/*
- * @brief Minimum output value of PID to be within a valid pressure range. */
-//
-//
-pub const BRAKE_PID_OUTPUT_MIN: f32 = -10.0;
-
-/*
- * @brief Maximum output value of PID to be within a valid pressure range. */
-//
-//
-pub const BRAKE_PID_OUTPUT_MAX: f32 = 10.0;
-
-/*
- * @brief Minimum clamped PID value of the actuation solenoid. */
-//
-//
-pub const BRAKE_PID_ACCUMULATOR_SOLENOID_CLAMPED_MIN: f32 = 10.0;
-
-/*
- * @brief Maximum clamped PID value of the actuation solenoid. */
-//
-//
-pub const BRAKE_PID_ACCUMULATOR_SOLENOID_CLAMPED_MAX: f32 = 110.0;
-
-/*
- * @brief Minimum clamped PID value of the release solenoid. */
-//
-//
-pub const BRAKE_PID_RELEASE_SOLENOID_CLAMPED_MIN: f32 = 0.0;
-
-/*
- * @brief Maximum clamped PID value of the release solenoid. */
-//
-//
-pub const BRAKE_PID_RELEASE_SOLENOID_CLAMPED_MAX: f32 = 60.0;
-
-/*
- * @brief Minimum duty cycle that begins to actuate the actuation solenoid. */
-//
-// 3.921 KHz PWM frequency
-//
-//
-pub const BRAKE_ACCUMULATOR_SOLENOID_DUTY_CYCLE_MIN: f32 = 80.0;
-
-/*
- * @brief Maximum duty cycle where actuation solenoid has reached its stop. */
-//
-// 3.921 KHz PWM frequency
-//
-//
-pub const BRAKE_ACCUMULATOR_SOLENOID_DUTY_CYCLE_MAX: f32 = 105.0;
-
-/*
- * @brief Minimum duty cycle that begins to actuate the release solenoid. */
-//
-// 3.921 KHz PWM frequency
-//
-//
-pub const BRAKE_RELEASE_SOLENOID_DUTY_CYCLE_MIN: f32 = 65.0;
-
-/*
- * @brief Maximum duty cycle where release solenoid has reached its stop. */
-//
-// 3.921 KHz PWM frequency
-//
-//
-pub const BRAKE_RELEASE_SOLENOID_DUTY_CYCLE_MAX: f32 = 100.0;
+pub const BRAKE_LIGHT_SPOOF_LOW_THRESHOLD: u16 = 600;
 
 // ****************************************************************************
 // STEERING MODULE
@@ -337,7 +275,7 @@ pub const TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_OFFSET: f32 = 2.42;
  * @brief Minimum allowed value for the high spoof signal value. */
 //
 //
-pub const fn steering_torque_to_volts_high(torque: f32) -> f32 {
+pub const fn steering_torque_to_volts_low(torque: f32) -> f32 {
     (TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_SCALE * torque)
         + TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_OFFSET
 }
@@ -346,7 +284,7 @@ pub const fn steering_torque_to_volts_high(torque: f32) -> f32 {
  * @brief Calculation to convert a steering torque to a low spoof value. */
 //
 //
-pub const fn steering_torque_to_volts_low(torque: f32) -> f32 {
+pub const fn steering_torque_to_volts_high(torque: f32) -> f32 {
     (TORQUE_SPOOF_LOW_SIGNAL_CALIBRATION_CURVE_SCALE * torque)
         + TORQUE_SPOOF_LOW_SIGNAL_CALIBRATION_CURVE_OFFSET
 }
@@ -378,53 +316,53 @@ pub const MAXIMUM_THROTTLE_COMMAND: f32 = 1.0;
  * @brief Minimum allowed voltage for the low spoof signal voltage. [volts] */
 //
 //
-pub const THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN: f32 = 0.30;
+pub const THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN: f32 = 0.380;
 
 /*
  * @brief Maximum allowed voltage for the low spoof signal voltage. [volts] */
 //
 //
-pub const THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX: f32 = 2.00;
+pub const THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX: f32 = 2.104;
 
 /*
  * @brief Minimum allowed voltage for the high spoof signal voltage. [volts] */
 //
 //
-pub const THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN: f32 = 0.70;
+pub const THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN: f32 = 0.757;
 
 /*
  * @brief Maximum allowed voltage for the high spoof signal voltage. [volts] */
 //
 //
-pub const THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX: f32 = 4.10;
+pub const THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX: f32 = 4.207;
 
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
 // Equal to \ref THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN * \ref STEPS_PER_VOLT.
 //
-pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 245;
+pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 311;
 
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
 // Equal to \ref THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
 //
-pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 1638;
+pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 1723;
 
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
 // Equal to \ref THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN * \ref STEPS_PER_VOLT.
 //
-pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 573;
+pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 620;
 
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
 // Equal to \ref THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
 //
-pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 3358;
+pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 3446;
 
 /*
  * @brief Calculation to convert a throttle position to a low spoof voltage. */

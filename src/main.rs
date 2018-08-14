@@ -23,10 +23,6 @@ mod steering_module;
 mod throttle_module;
 mod types;
 
-// TODO - feature gate
-#[path = "brake/kial_soul_ev_niro/brake_module.rs"]
-mod brake_module;
-
 #[path = "can_protocols/brake_can_protocol.rs"]
 mod brake_can_protocol;
 #[path = "can_protocols/fault_can_protocol.rs"]
@@ -38,16 +34,23 @@ mod steering_can_protocol;
 #[path = "can_protocols/throttle_can_protocol.rs"]
 mod throttle_can_protocol;
 
+#[cfg(feature = "kia-niro")]
+#[path = "vehicles/kial_niro.rs"]
+mod kial_niro;
 #[cfg(feature = "kia-soul-ev")]
 #[path = "vehicles/kial_soul_ev.rs"]
 mod kial_soul_ev;
-#[cfg(feature = "kia-soul-niro")]
-#[path = "vehicles/kial_soul_niro.rs"]
-mod kial_soul_niro;
 #[cfg(feature = "kia-soul-petrol")]
 #[path = "vehicles/kial_soul_petrol.rs"]
 mod kial_soul_petrol;
 mod vehicle;
+
+#[cfg(any(feature = "kia-soul-ev", feature = "kia-niro"))]
+#[path = "brake/kia_soul_ev_niro/brake_module.rs"]
+mod brake_module;
+#[cfg(feature = "kia-soul-petrol")]
+#[path = "brake/kia_soul_petrol/brake_module.rs"]
+mod brake_module;
 
 use board::{hard_fault_indicator, Board};
 use brake_module::BrakeModule;

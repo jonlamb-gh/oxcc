@@ -32,6 +32,8 @@ lto = true # better optimizations
 
 [features]
 default = ["kia-soul-ev"]
+#default = ["kia-soul-petrol"]
+#default = ["kia-niro"]
 kia-soul-ev = []
 kia-soul-petrol = []
-kia-soul-niro = []
+kia-niro = []
