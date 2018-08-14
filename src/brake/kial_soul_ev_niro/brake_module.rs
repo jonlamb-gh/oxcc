@@ -222,13 +222,13 @@ impl BrakeModule {
         );
 
         let spoof_voltage_low: f32 = num::clamp(
-            self.brake_position_to_volts_low(clamped_position),
+            brake_position_to_volts_low(clamped_position),
             BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN,
             BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX,
         );
 
         let spoof_voltage_high: f32 = num::clamp(
-            self.brake_position_to_volts_high(clamped_position),
+            brake_position_to_volts_high(clamped_position),
             BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN,
             BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX,
         );
@@ -237,16 +237,6 @@ impl BrakeModule {
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
         self.update_brake(spoof_value_high, spoof_value_low, board);
-    }
-
-    fn brake_position_to_volts_low(&self, pos: f32) -> f32 {
-        pos * (BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX - BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN)
-            + BRAKE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN
-    }
-
-    fn brake_position_to_volts_high(&self, pos: f32) -> f32 {
-        pos * (BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX - BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN)
-            + BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
     }
 
     fn read_brake_pedal_position_sensor(&mut self, board: &mut Board) {

@@ -220,13 +220,13 @@ impl SteeringModule {
         );
 
         let spoof_voltage_low: f32 = num::clamp(
-            self.steering_torque_to_volts_low(clamped_torque),
+            steering_torque_to_volts_low(clamped_torque),
             STEERING_SPOOF_LOW_SIGNAL_VOLTAGE_MIN,
             STEERING_SPOOF_LOW_SIGNAL_VOLTAGE_MAX,
         );
 
         let spoof_voltage_high: f32 = num::clamp(
-            self.steering_torque_to_volts_high(clamped_torque),
+            steering_torque_to_volts_high(clamped_torque),
             STEERING_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN,
             STEERING_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX,
         );
@@ -235,16 +235,6 @@ impl SteeringModule {
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
         self.update_steering(spoof_value_high, spoof_value_low, board);
-    }
-
-    fn steering_torque_to_volts_low(&self, torque: f32) -> f32 {
-        (TORQUE_SPOOF_LOW_SIGNAL_CALIBRATION_CURVE_SCALE * torque)
-            + TORQUE_SPOOF_LOW_SIGNAL_CALIBRATION_CURVE_OFFSET
-    }
-
-    fn steering_torque_to_volts_high(&self, torque: f32) -> f32 {
-        (TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_SCALE * torque)
-            + TORQUE_SPOOF_HIGH_SIGNAL_CALIBRATION_CURVE_OFFSET
     }
 
     fn read_torque_sensor(&mut self, board: &mut Board) {

@@ -212,13 +212,13 @@ impl ThrottleModule {
         );
 
         let spoof_voltage_low: f32 = num::clamp(
-            self.throttle_position_to_volts_low(clamped_position),
+            throttle_position_to_volts_low(clamped_position),
             THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN,
             THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX,
         );
 
         let spoof_voltage_high: f32 = num::clamp(
-            self.throttle_position_to_volts_high(clamped_position),
+            throttle_position_to_volts_high(clamped_position),
             THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN,
             THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX,
         );
@@ -227,16 +227,6 @@ impl ThrottleModule {
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
         self.update_throttle(spoof_value_high, spoof_value_low, board);
-    }
-
-    fn throttle_position_to_volts_low(&self, pos: f32) -> f32 {
-        pos * (THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MAX - THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN)
-            + THROTTLE_SPOOF_LOW_SIGNAL_VOLTAGE_MIN
-    }
-
-    fn throttle_position_to_volts_high(&self, pos: f32) -> f32 {
-        pos * (THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX - THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN)
-            + THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
     }
 
     fn read_accelerator_position_sensor(&mut self, board: &mut Board) {
