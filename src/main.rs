@@ -76,7 +76,31 @@ fn main() -> ! {
 
     // turn on the blue LED
     board.leds[led::Color::Blue].on();
-    writeln!(board.debug_console, "oxcc is running").unwrap();
+
+    // show startup message and reset warnings if debugging
+    #[cfg(debug_assertions)]
+    {
+        writeln!(board.debug_console, "oxcc is running").unwrap();
+
+        if board.reset_conditions.low_power {
+            writeln!(board.debug_console, "WARNING: low-power reset detected").unwrap();
+        }
+        if board.reset_conditions.window_watchdog || board.reset_conditions.independent_watchdog {
+            writeln!(board.debug_console, "WARNING: watchdog reset detected").unwrap();
+        }
+        if board.reset_conditions.software {
+            writeln!(board.debug_console, "WARNING: software reset detected").unwrap();
+        }
+        if board.reset_conditions.por_pdr {
+            writeln!(board.debug_console, "WARNING: POR/PDR reset detected").unwrap();
+        }
+        if board.reset_conditions.pin {
+            writeln!(board.debug_console, "WARNING: PIN reset detected").unwrap();
+        }
+        if board.reset_conditions.bor {
+            writeln!(board.debug_console, "WARNING: BOR reset detected").unwrap();
+        }
+    }
 
     let mut brake = BrakeModule::new();
     let mut throttle = ThrottleModule::new();
@@ -94,6 +118,9 @@ fn main() -> ! {
     steering.publish_steering_report(&mut board);
 
     loop {
+        // refresh the independent watchdog
+        board.wdg.refresh();
+
         // poll both control CAN FIFOs
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
             if let Ok(rx_frame) = board.control_can().receive(fifo) {

@@ -7,10 +7,12 @@ use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
 use nucleo_f767zi::hal::can::{Can, CanConfig};
 use nucleo_f767zi::hal::delay::Delay;
+use nucleo_f767zi::hal::iwdg::{Iwdg, Prescaler};
 use nucleo_f767zi::hal::prelude::*;
+use nucleo_f767zi::hal::rcc::ResetConditions;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::stm32f7x7;
-use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC3};
+use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
 
@@ -30,7 +32,6 @@ pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
 pub const DAC_SAMPLE_AVERAGE_COUNT: u32 = 20;
 
 pub struct Board {
-    //pub semihost_console: hio::HStdout,
     pub debug_console: DebugConsole,
     pub leds: Leds,
     pub user_button: UserButtonPin,
@@ -38,6 +39,8 @@ pub struct Board {
     pub timer_ms: MsTimer,
     pub can_publish_timer: CanPublishTimer,
     pub dac: Mcp49xx,
+    pub wdg: Iwdg<IWDG>,
+    pub reset_conditions: ResetConditions,
     control_can: ControlCan,
     obd_can: ObdCan,
     adc1: Adc<ADC1>,
@@ -49,6 +52,9 @@ pub struct Board {
 
 impl Board {
     pub fn new() -> Self {
+        // read the RCC reset condition flags before anything else
+        let reset_conditions = ResetConditions::read_and_clear();
+
         let mut core_peripherals = cortex_m::Peripherals::take().unwrap();
         let peripherals = stm32f7x7::Peripherals::take().unwrap();
 
@@ -212,6 +218,9 @@ impl Board {
                 &mut rcc.apb1,
             ),
             dac: Mcp49xx::new(),
+            // TODO - use LSI oscillator frequency to get units in time
+            wdg: Iwdg::new(peripherals.IWDG, Prescaler::Prescaler16),
+            reset_conditions,
             control_can,
             obd_can,
             adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2),
