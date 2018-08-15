@@ -2,6 +2,7 @@ use adc_signal::AdcSignal;
 use config;
 use cortex_m;
 use dac_mcp4922::Mcp4922;
+use dac_mcp4922::MODE as DAC_MODE;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
@@ -11,7 +12,7 @@ use nucleo_f767zi::hal::iwdg::{Iwdg, Prescaler};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::rcc::ResetConditions;
 use nucleo_f767zi::hal::serial::Serial;
-use nucleo_f767zi::hal::spi::{Mode, Phase, Polarity, Spi};
+use nucleo_f767zi::hal::spi::Spi;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
@@ -236,12 +237,8 @@ impl Board {
 
         let brake_spi: BrakeSpi = Spi::spi1(
             peripherals.SPI1,
-            // TODO - SPI mode should be provided by the MCPxx
             (brake_sck, brake_miso, brake_mosi),
-            Mode {
-                phase: Phase::CaptureOnFirstTransition,
-                polarity: Polarity::IdleLow,
-            },
+            DAC_MODE,
             1.mhz().into(),
             clocks,
             &mut rcc.apb2,
@@ -249,12 +246,8 @@ impl Board {
 
         let throttle_spi: ThrottleSpi = Spi::spi2(
             peripherals.SPI2,
-            // TODO - SPI mode should be provided by the MCPxx
             (throttle_sck, throttle_miso, throttle_mosi),
-            Mode {
-                phase: Phase::CaptureOnFirstTransition,
-                polarity: Polarity::IdleLow,
-            },
+            DAC_MODE,
             1.mhz().into(),
             clocks,
             &mut rcc.apb1,
@@ -262,12 +255,8 @@ impl Board {
 
         let steering_spi: SteeringSpi = Spi::spi3(
             peripherals.SPI3,
-            // TODO - SPI mode should be provided by the MCPxx
             (steering_sck, steering_miso, steering_mosi),
-            Mode {
-                phase: Phase::CaptureOnFirstTransition,
-                polarity: Polarity::IdleLow,
-            },
+            DAC_MODE,
             1.mhz().into(),
             clocks,
             &mut rcc.apb1,
