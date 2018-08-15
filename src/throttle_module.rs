@@ -67,7 +67,7 @@ impl ThrottleModule {
             self.accelerator_position
                 .prevent_signal_discontinuity(board);
 
-            board.steering_dac().output_ab(
+            board.throttle_dac().output_ab(
                 self.accelerator_position.dac_output_a(),
                 self.accelerator_position.dac_output_b(),
             );
@@ -83,7 +83,7 @@ impl ThrottleModule {
             self.accelerator_position
                 .prevent_signal_discontinuity(board);
 
-            board.steering_dac().output_ab(
+            board.throttle_dac().output_ab(
                 self.accelerator_position.dac_output_a(),
                 self.accelerator_position.dac_output_b(),
             );

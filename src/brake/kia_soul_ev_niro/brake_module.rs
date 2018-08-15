@@ -68,7 +68,7 @@ impl BrakeModule {
             self.brake_pedal_position
                 .prevent_signal_discontinuity(board);
 
-            board.steering_dac().output_ab(
+            board.brake_dac().output_ab(
                 self.brake_pedal_position.dac_output_a(),
                 self.brake_pedal_position.dac_output_b(),
             );
@@ -85,7 +85,7 @@ impl BrakeModule {
             self.brake_pedal_position
                 .prevent_signal_discontinuity(board);
 
-            board.steering_dac().output_ab(
+            board.brake_dac().output_ab(
                 self.brake_pedal_position.dac_output_a(),
                 self.brake_pedal_position.dac_output_b(),
             );
