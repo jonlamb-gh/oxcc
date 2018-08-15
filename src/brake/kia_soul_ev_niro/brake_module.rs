@@ -61,13 +61,17 @@ impl BrakeModule {
     pub fn init_devices(&self, board: &mut Board) {
         board.brake_spoof_enable().set_low();
         board.brake_light_enable().set_low();
-        // TODO - PIN_DAC_CHIP_SELECT, HIGH
     }
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
             self.brake_pedal_position
                 .prevent_signal_discontinuity(board);
+
+            board.steering_dac().output_ab(
+                self.brake_pedal_position.dac_output_a(),
+                self.brake_pedal_position.dac_output_b(),
+            );
 
             board.brake_spoof_enable().set_low();
             board.brake_light_enable().set_low();
@@ -80,6 +84,11 @@ impl BrakeModule {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.brake_pedal_position
                 .prevent_signal_discontinuity(board);
+
+            board.steering_dac().output_ab(
+                self.brake_pedal_position.dac_output_a(),
+                self.brake_pedal_position.dac_output_b(),
+            );
 
             board.brake_spoof_enable().set_high();
             self.control_state.enabled = true;
@@ -115,7 +124,7 @@ impl BrakeModule {
             }
 
             // TODO - revisit this, enforce high->A, low->B
-            board.dac.set_outputs(spoof_high, spoof_low);
+            board.brake_dac().output_ab(spoof_high, spoof_low);
         }
     }
 

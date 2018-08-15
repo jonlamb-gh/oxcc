@@ -62,12 +62,16 @@ impl SteeringModule {
 
     pub fn init_devices(&self, board: &mut Board) {
         board.steering_spoof_enable().set_low();
-        // TODO - PIN_DAC_CHIP_SELECT, HIGH
     }
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
             self.steering_torque.prevent_signal_discontinuity(board);
+
+            board.steering_dac().output_ab(
+                self.steering_torque.dac_output_a(),
+                self.steering_torque.dac_output_b(),
+            );
 
             board.steering_spoof_enable().set_low();
             self.control_state.enabled = false;
@@ -78,6 +82,11 @@ impl SteeringModule {
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.steering_torque.prevent_signal_discontinuity(board);
+
+            board.steering_dac().output_ab(
+                self.steering_torque.dac_output_a(),
+                self.steering_torque.dac_output_b(),
+            );
 
             board.steering_spoof_enable().set_high();
             self.control_state.enabled = true;
@@ -105,7 +114,7 @@ impl SteeringModule {
             );
 
             // TODO - revisit this, enforce high->A, low->B
-            board.dac.set_outputs(spoof_high, spoof_low);
+            board.steering_dac().output_ab(spoof_high, spoof_low);
         }
     }
 

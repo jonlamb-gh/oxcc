@@ -1,7 +1,7 @@
 use adc_signal::AdcSignal;
 use config;
 use cortex_m;
-use dac_mcp49xx::Mcp49xx;
+use dac_mcp4922::Mcp4922;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
@@ -11,6 +11,7 @@ use nucleo_f767zi::hal::iwdg::{Iwdg, Prescaler};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::rcc::ResetConditions;
 use nucleo_f767zi::hal::serial::Serial;
+use nucleo_f767zi::hal::spi::{Mode, Phase, Polarity, Spi};
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
@@ -38,13 +39,15 @@ pub struct Board {
     pub delay: Delay,
     pub timer_ms: MsTimer,
     pub can_publish_timer: CanPublishTimer,
-    pub dac: Mcp49xx,
     pub wdg: Iwdg<IWDG>,
     pub reset_conditions: ResetConditions,
     control_can: ControlCan,
     obd_can: ObdCan,
     adc1: Adc<ADC1>,
     adc3: Adc<ADC3>,
+    brake_dac: BrakeDac,
+    throttle_dac: ThrottleDac,
+    steering_dac: SteeringDac,
     brake_pins: BrakePins,
     throttle_pins: ThrottlePins,
     steering_pins: SteeringPins,
@@ -88,6 +91,14 @@ impl Board {
                 .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
         };
 
+        // TODO - move these once DAC impl is ready
+        let brake_sck: BrakeSpiSckPin = gpioa.pa5.into_af5(&mut gpioa.moder, &mut gpioa.afrl);
+        let brake_miso: BrakeSpiMisoPin = gpioa.pa6.into_af5(&mut gpioa.moder, &mut gpioa.afrl);
+        let brake_mosi: BrakeSpiMosiPin = gpioa.pa7.into_af5(&mut gpioa.moder, &mut gpioa.afrl);
+        let brake_nss: BrakeSpiNssPin = gpioa
+            .pa4
+            .into_push_pull_output(&mut gpioa.moder, &mut gpioa.otyper);
+
         let throttle_pins = ThrottlePins {
             spoof_enable: gpiod
                 .pd10
@@ -100,6 +111,16 @@ impl Board {
                 .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr),
         };
 
+        let throttle_sck: ThrottleSpiSckPin =
+            gpiob.pb10.into_af5(&mut gpiob.moder, &mut gpiob.afrh);
+        let throttle_miso: ThrottleSpiMisoPin =
+            gpioc.pc2.into_af5(&mut gpioc.moder, &mut gpioc.afrl);
+        let throttle_mosi: ThrottleSpiMosiPin =
+            gpiob.pb15.into_af5(&mut gpiob.moder, &mut gpiob.afrh);
+        let throttle_nss: ThrottleSpiNssPin = gpiob
+            .pb4
+            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
+
         let steering_pins = SteeringPins {
             spoof_enable: gpiod
                 .pd11
@@ -111,6 +132,16 @@ impl Board {
                 .pf3
                 .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
         };
+
+        let steering_sck: SteeringSpiSckPin =
+            gpioc.pc10.into_af5(&mut gpioc.moder, &mut gpioc.afrh);
+        let steering_miso: SteeringSpiMisoPin =
+            gpioc.pc11.into_af5(&mut gpioc.moder, &mut gpioc.afrh);
+        let steering_mosi: SteeringSpiMosiPin =
+            gpioc.pc12.into_af5(&mut gpioc.moder, &mut gpioc.afrh);
+        let steering_nss: SteeringSpiNssPin = gpioa
+            .pa15
+            .into_push_pull_output(&mut gpioa.moder, &mut gpioa.otyper);
 
         let led_r = gpiob
             .pb14
@@ -203,6 +234,45 @@ impl Board {
                 .expect("Failed to configure OBD CAN filter");
         }
 
+        let brake_spi: BrakeSpi = Spi::spi1(
+            peripherals.SPI1,
+            // TODO - SPI mode should be provided by the MCPxx
+            (brake_sck, brake_miso, brake_mosi),
+            Mode {
+                phase: Phase::CaptureOnFirstTransition,
+                polarity: Polarity::IdleLow,
+            },
+            1.mhz().into(),
+            clocks,
+            &mut rcc.apb2,
+        );
+
+        let throttle_spi: ThrottleSpi = Spi::spi2(
+            peripherals.SPI2,
+            // TODO - SPI mode should be provided by the MCPxx
+            (throttle_sck, throttle_miso, throttle_mosi),
+            Mode {
+                phase: Phase::CaptureOnFirstTransition,
+                polarity: Polarity::IdleLow,
+            },
+            1.mhz().into(),
+            clocks,
+            &mut rcc.apb1,
+        );
+
+        let steering_spi: SteeringSpi = Spi::spi3(
+            peripherals.SPI3,
+            // TODO - SPI mode should be provided by the MCPxx
+            (steering_sck, steering_miso, steering_mosi),
+            Mode {
+                phase: Phase::CaptureOnFirstTransition,
+                polarity: Polarity::IdleLow,
+            },
+            1.mhz().into(),
+            clocks,
+            &mut rcc.apb1,
+        );
+
         Board {
             debug_console: DebugConsole::new(serial),
             leds,
@@ -217,7 +287,6 @@ impl Board {
                 clocks,
                 &mut rcc.apb1,
             ),
-            dac: Mcp49xx::new(),
             // TODO - use LSI oscillator frequency to get units in time
             wdg: Iwdg::new(peripherals.IWDG, Prescaler::Prescaler16),
             reset_conditions,
@@ -225,6 +294,9 @@ impl Board {
             obd_can,
             adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2),
             adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2),
+            brake_dac: Mcp4922::new(brake_spi, brake_nss),
+            throttle_dac: Mcp4922::new(throttle_spi, throttle_nss),
+            steering_dac: Mcp4922::new(steering_spi, steering_nss),
             brake_pins,
             throttle_pins,
             steering_pins,
@@ -257,6 +329,18 @@ impl Board {
 
     pub fn obd_can(&mut self) -> &mut ObdCan {
         &mut self.obd_can
+    }
+
+    pub fn brake_dac(&mut self) -> &mut BrakeDac {
+        &mut self.brake_dac
+    }
+
+    pub fn throttle_dac(&mut self) -> &mut ThrottleDac {
+        &mut self.throttle_dac
+    }
+
+    pub fn steering_dac(&mut self) -> &mut SteeringDac {
+        &mut self.steering_dac
     }
 
     pub fn analog_read(&mut self, signal: AdcSignal, sample_time: AdcSampleTime) -> u16 {

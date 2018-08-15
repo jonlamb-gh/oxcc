@@ -68,7 +68,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "nucleo-f767zi"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#e85ec2d3f8b5456280a81a7214ae825da88c97b4"
+source = "git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel#a9bc4b0d51464d6bf5a2be3c2a65ee398ffc746d"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -134,6 +134,7 @@ dependencies = [
  "cortex-m 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m-rt 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m-semihosting 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "nucleo-f767zi 0.0.1 (git+https://github.com/jonlamb-gh/nucleo-f767zi.git?branch=devel)",
  "num 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "panic-abort 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -173,7 +174,7 @@ dependencies = [
 [[package]]
 name = "stm32f767-hal"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#d920564c6d08773a707804e1876a3e9b651edc34"
+source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#d0e7e2946fde0da06a9b01b65c430f2830e50dc5"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",

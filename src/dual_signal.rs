@@ -42,10 +42,6 @@ impl DualSignal {
 
         self.low = (low / DAC_SAMPLE_AVERAGE_COUNT) as _;
         self.high = (high / DAC_SAMPLE_AVERAGE_COUNT) as _;
-
-        board
-            .dac
-            .set_outputs(self.dac_output_a(), self.dac_output_b());
     }
 
     pub fn average(&self) -> u32 {

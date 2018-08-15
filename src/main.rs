@@ -7,6 +7,7 @@ extern crate cortex_m;
 extern crate cortex_m_rt as rt;
 #[cfg(feature = "panic-over-semihosting")]
 extern crate cortex_m_semihosting;
+extern crate embedded_hal;
 extern crate nucleo_f767zi;
 extern crate num;
 #[cfg(feature = "panic-over-abort")]
@@ -18,7 +19,7 @@ mod adc_signal;
 mod board;
 mod can_gateway_module;
 mod config;
-mod dac_mcp49xx;
+mod dac_mcp4922;
 mod dtc;
 mod dual_signal;
 mod fault_condition;

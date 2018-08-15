@@ -33,6 +33,10 @@ features = ["rt"]
 version = "0.2"
 default-features = false
 
+[dependencies.embedded-hal]
+features = ["unproven"]
+version = "0.2.0"
+
 [profile.release]
 codegen-units = 1 # better optimizations
 lto = true # better optimizations
