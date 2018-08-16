@@ -9,6 +9,8 @@ rustup component add rust-src
 
 rustup target add thumbv7em-none-eabihf
 
+cargo install svd2rust
+
 # currently used for linking
 # TODO - switch over to lld
 sudo apt-get install gcc-arm-none-eabi
