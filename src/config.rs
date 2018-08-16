@@ -16,11 +16,12 @@ pub const CONTROL_CAN_CONFIG: CanConfig = CanConfig {
     nart: false,
     rflm: false,
     txfp: false,
-    // 500K
+    // TODO - update CAN impl to calculate these
+    // 500K with 216 MHz system clock /= 4 = 54 MHz pclk1
     bit_timing: CanBitTiming {
-        prescaler: 1, // 2
+        prescaler: 5, // 6
         sjw: 0,       // CAN_SJW_1TQ
-        bs1: 12,      // CAN_BS1_13TQ
+        bs1: 14,      // CAN_BS1_15TQ
         bs2: 1,       // CAN_BS2_2TQ
     },
 };
@@ -34,11 +35,11 @@ pub const OBD_CAN_CONFIG: CanConfig = CanConfig {
     nart: false,
     rflm: false,
     txfp: false,
-    // 500K
+    // 500K with 216 MHz system clock /= 4 = 54 MHz pclk1
     bit_timing: CanBitTiming {
-        prescaler: 1, // 2
+        prescaler: 5, // 6
         sjw: 0,       // CAN_SJW_1TQ
-        bs1: 12,      // CAN_BS1_13TQ
+        bs1: 14,      // CAN_BS1_15TQ
         bs2: 1,       // CAN_BS2_2TQ
     },
 };
