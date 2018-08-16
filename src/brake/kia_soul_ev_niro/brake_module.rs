@@ -161,7 +161,7 @@ impl BrakeModule {
                     board.debug_console,
                     "Bad value read from brake pedal position sensor"
                 );
-            } else if operator_overridden {
+            } else if operator_overridden && ! self.control_state.operator_override {
                 self.disable_control(board);
 
                 self.control_state
@@ -169,6 +169,8 @@ impl BrakeModule {
                     .set(OSCC_BRAKE_DTC_OPERATOR_OVERRIDE);
 
                 self.publish_fault_report(board);
+
+                self.control_state.operator_override = true;
 
                 writeln!(board.debug_console, "Brake operator override");
             } else {
