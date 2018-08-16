@@ -8,6 +8,10 @@ rustup default nightly
 rustup component add rust-src
 
 rustup target add thumbv7em-none-eabihf
+
+# currently used for linking
+# TODO - switch over to lld
+sudo apt-get install gcc-arm-none-eabi
 ```
 
 ```bash
