@@ -267,7 +267,7 @@ impl Board {
                 &mut rcc.apb1,
             ),
             // TODO - use LSI oscillator frequency to get units in time
-            wdg: Iwdg::new(peripherals.IWDG, Prescaler::Prescaler16),
+            wdg: Iwdg::new(peripherals.IWDG, 0xF, Prescaler::Prescaler64),
             reset_conditions,
             control_can,
             obd_can,

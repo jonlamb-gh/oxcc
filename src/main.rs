@@ -155,9 +155,10 @@ fn main() -> ! {
 
         // TODO - do anything with the user button?
         if board.user_button() {
+            while board.user_button() {}
             // can only do this when we're debugging/semihosting
-            #[cfg(feature = "panic-over-semihosting")]
-            cortex_m::asm::bkpt();
+            //#[cfg(feature = "panic-over-semihosting")]
+            //cortex_m::asm::bkpt();
         }
     }
 }
