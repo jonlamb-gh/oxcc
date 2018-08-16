@@ -6,6 +6,7 @@
 rustup default nightly
 
 rustup component add rust-src
+rustup component add rustfmt-preview
 
 rustup target add thumbv7em-none-eabihf
 

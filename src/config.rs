@@ -1,14 +1,51 @@
 use brake_can_protocol::*;
 use fault_can_protocol::*;
-use nucleo_f767zi::hal::can::{CanFilterConfig, FilterMode, FilterScale, RxFifo};
+use nucleo_f767zi::hal::can::{
+    CanBitTiming, CanConfig, CanFilterConfig, FilterMode, FilterScale, RxFifo,
+};
 use steering_can_protocol::*;
 use throttle_can_protocol::*;
 use vehicle::*;
 
+pub const CONTROL_CAN_CONFIG: CanConfig = CanConfig {
+    loopback_mode: false,
+    silent_mode: false,
+    ttcm: false,
+    abom: true,
+    awum: false,
+    nart: false,
+    rflm: false,
+    txfp: false,
+    // 500K
+    bit_timing: CanBitTiming {
+        prescaler: 1, // 2
+        sjw: 0,       // CAN_SJW_1TQ
+        bs1: 12,      // CAN_BS1_13TQ
+        bs2: 1,       // CAN_BS2_2TQ
+    },
+};
+
+pub const OBD_CAN_CONFIG: CanConfig = CanConfig {
+    loopback_mode: false,
+    silent_mode: false,
+    ttcm: false,
+    abom: true,
+    awum: false,
+    nart: false,
+    rflm: false,
+    txfp: false,
+    // 500K
+    bit_timing: CanBitTiming {
+        prescaler: 1, // 2
+        sjw: 0,       // CAN_SJW_1TQ
+        bs1: 12,      // CAN_BS1_13TQ
+        bs2: 1,       // CAN_BS2_2TQ
+    },
+};
+
 // TODO - docs on priority ordering in ID list mode
 // can we make a pub type instead?
 // CanFilterConfig { enabled: true, ..Default::default() }
-
 pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     // filter 0 is the highest priority filter in ID list mode
     // it stores the disable control IDs for throttle, brake, steering

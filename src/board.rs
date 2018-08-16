@@ -6,7 +6,7 @@ use dac_mcp4922::MODE as DAC_MODE;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
-use nucleo_f767zi::hal::can::{Can, CanConfig};
+use nucleo_f767zi::hal::can::Can;
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::iwdg::{Iwdg, Prescaler};
 use nucleo_f767zi::hal::prelude::*;
@@ -192,24 +192,23 @@ impl Board {
             &mut rcc.apb1,
         );
 
+        /* NOTE: the default config can fail if there are CAN bus or config issues */
+        /* &CanConfig::default(), */
+        /* loopback/silent mode can be used for testing */
+        /* &CanConfig { loopback_mode: true, silent_mode: true,
+         * ..CanConfig::default() }, */
         let control_can = Can::can1(
             peripherals.CAN1,
             (can1_tx, can1_rx),
             &mut rcc.apb1,
-            /* NOTE: the default config can fail if there are CAN bus or config issues */
-            &CanConfig::default(),
-            /* loopback/silent mode can be used for testing */
-            /* &CanConfig { loopback_mode: true, silent_mode: true, ..CanConfig::default() }, */
+            &config::CONTROL_CAN_CONFIG,
         ).expect("Failed to configure ontrol CAN (CAN1)");
 
         let obd_can = Can::can2(
             peripherals.CAN2,
             (can2_tx, can2_rx),
             &mut rcc.apb1,
-            /* NOTE: the default config can fail if there are CAN bus or config issues */
-            &CanConfig::default(),
-            /* loopback/silent mode can be used for testing */
-            /* &CanConfig { loopback_mode: true, silent_mode: true, ..CanConfig::default() }, */
+            &config::OBD_CAN_CONFIG,
         ).expect("Failed to configure OBD CAN (CAN2)");
 
         // apply control CAN filters
