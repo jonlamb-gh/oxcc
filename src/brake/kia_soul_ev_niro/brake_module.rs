@@ -161,7 +161,7 @@ impl BrakeModule {
                     board.debug_console,
                     "Bad value read from brake pedal position sensor"
                 );
-            } else if operator_overridden && ! self.control_state.operator_override {
+            } else if operator_overridden && !self.control_state.operator_override {
                 self.disable_control(board);
 
                 self.control_state

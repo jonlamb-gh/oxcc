@@ -151,7 +151,7 @@ impl ThrottleModule {
                     board.debug_console,
                     "Bad value read from accelerator position sensor"
                 );
-            } else if operator_overridden && ! self.control_state.operator_override {
+            } else if operator_overridden && !self.control_state.operator_override {
                 self.disable_control(board);
 
                 self.control_state
@@ -159,7 +159,7 @@ impl ThrottleModule {
                     .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
                 self.publish_fault_report(board);
-                
+
                 self.control_state.operator_override = true;
 
                 writeln!(board.debug_console, "Throttle operator override");

@@ -153,7 +153,9 @@ impl SteeringModule {
                 self.publish_fault_report(board);
 
                 writeln!(board.debug_console, "Bad value read from torque sensor");
-            } else if self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD {
+            } else if (self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD)
+                && !self.control_state.operator_override
+            {
                 self.disable_control(board);
 
                 self.control_state
