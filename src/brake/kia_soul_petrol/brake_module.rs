@@ -14,7 +14,7 @@ impl BrakeModule {
         BrakeModule {}
     }
 
-    pub fn init_devices(&self, board) {
+    pub fn init_devices(&self) {
         board.brake_spoof_enable().set_low();
         board.brake_light_enable().set_low();
         // TODO - PIN_DAC_CHIP_SELECT, HIGH
