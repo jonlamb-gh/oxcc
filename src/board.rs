@@ -164,20 +164,11 @@ impl Board {
         let can2_rx = gpiob.pb12.into_af9(&mut gpiob.moder, &mut gpiob.afrh);
 
         // default clock configuration runs at 16 MHz
-        let clocks = rcc.cfgr.freeze(&mut flash.acr);
-        //
-        // TODO - alternate clock configuration, breaks delay/timers/etc currently
-        // need to check timer impl as well with this change
-        /*
-        let clocks = rcc.cfgr
-            .sysclk(64.mhz())
-            .hclk(64.mhz())
-            .pclk1(16.mhz())
-            .pclk2(32.mhz())
-            .freeze(&mut flash.acr);
-        */
+        //let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
-        //writeln!(semihost_console, "clocks = {:#?}", clocks);
+        // TODO - enable OverDrive to get 216 MHz
+        // configure maximum clock frequency at 200 MHz
+        let clocks = rcc.cfgr.freeze_max(&mut flash.acr);
 
         // TODO - use the safe APIs once this block solidifies
         unsafe {

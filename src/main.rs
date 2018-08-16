@@ -151,8 +151,6 @@ fn main() -> ! {
             brake.publish_brake_report(&mut board);
             throttle.publish_throttle_report(&mut board);
             steering.publish_steering_report(&mut board);
-
-            //writeln!(board.debug_console, "{}", board.timer_ms.ms());
         }
 
         // TODO - do anything with the user button?
