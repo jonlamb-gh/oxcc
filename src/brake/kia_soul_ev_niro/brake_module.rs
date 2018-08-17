@@ -1,5 +1,6 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/brake/kia_soul_ev_niro
 
+use super::types::*;
 use adc_signal::AdcSignal;
 use board::Board;
 use brake_can_protocol::*;
@@ -13,7 +14,6 @@ use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
 use vehicle::*;
-use super::types::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
 
@@ -45,7 +45,7 @@ pub struct BrakeModule {
 }
 
 impl BrakeModule {
-    pub fn new(brake_dac:BrakeDac, brake_pins:BrakePins) -> Self {
+    pub fn new(brake_dac: BrakeDac, brake_pins: BrakePins) -> Self {
         BrakeModule {
             brake_pedal_position: DualSignal::new(
                 0,
@@ -59,7 +59,7 @@ impl BrakeModule {
             brake_report: OsccBrakeReport::new(),
             fault_report_frame: OsccFaultReportFrame::new(),
             brake_dac,
-            brake_pins
+            brake_pins,
         }
     }
 
@@ -111,11 +111,7 @@ impl BrakeModule {
         }
     }
 
-    pub fn update_brake(
-        &mut self,
-        spoof_command_high: u16,
-        spoof_command_low: u16,
-    ) {
+    pub fn update_brake(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
             let spoof_high = num::clamp(
                 spoof_command_high,
@@ -176,6 +172,12 @@ impl BrakeModule {
                     "Bad value read from brake pedal position sensor"
                 );
             } else if operator_overridden && !self.control_state.operator_override {
+                // TODO - oxcc change, don't continously disable when override is already
+                // handled oscc throttle module doesn't allow for continious
+                // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
+                // but brake and steering do?
+                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
+                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
                 self.disable_control(board);
 
                 self.control_state

@@ -322,33 +322,35 @@ impl FullBoard {
             throttle_pins,
             steering_pins,
         } = self;
-        (Board {
-            debug_console,
-            leds,
-            user_button,
-            delay,
-            timer_ms,
-            can_publish_timer,
-            wdg,
-            reset_conditions,
-            control_can,
-            obd_can,
-            adc1,
-            adc3,
-            throttle_dac,
-            steering_dac,
-            throttle_pins,
-            steering_pins,
-        }, brake_dac, brake_pins)
+        (
+            Board {
+                debug_console,
+                leds,
+                user_button,
+                delay,
+                timer_ms,
+                can_publish_timer,
+                wdg,
+                reset_conditions,
+                control_can,
+                obd_can,
+                adc1,
+                adc3,
+                throttle_dac,
+                steering_dac,
+                throttle_pins,
+                steering_pins,
+            },
+            brake_dac,
+            brake_pins,
+        )
     }
 }
 
 impl Board {
-
     pub fn user_button(&mut self) -> bool {
         self.user_button.is_high()
     }
-
 
     pub fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
         &mut self.throttle_pins.spoof_enable
