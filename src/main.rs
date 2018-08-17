@@ -72,7 +72,8 @@ entry!(main);
 fn main() -> ! {
     // once the organization is cleaned up, the entire board doesn't need to be
     // mutable let Board {mut leds, mut delay, ..} = Board::new();
-    let (mut board, brake_dac, brake_pins, brake_pedal_position_sensor, accelerator_position_sensor, torque_sensor) = FullBoard::new().split_components();
+    let (mut board, brake_dac, brake_pins, brake_pedal_position_sensor,
+        accelerator_position_sensor, throttle_dac, throttle_pins, torque_sensor) = FullBoard::new().split_components();
 
     // turn on the blue LED
     board.leds[led::Color::Blue].on();
@@ -103,12 +104,12 @@ fn main() -> ! {
     }
 
     let mut brake = BrakeModule::new(brake_dac, brake_pins, brake_pedal_position_sensor);
-    let mut throttle = ThrottleModule::new(accelerator_position_sensor);
+    let mut throttle = ThrottleModule::new(accelerator_position_sensor, throttle_dac, throttle_pins);
     let mut steering = SteeringModule::new(torque_sensor);
     let mut can_gateway = CanGatewayModule::new();
 
     brake.init_devices();
-    throttle.init_devices(&mut board);
+    throttle.init_devices();
     steering.init_devices(&mut board);
     can_gateway.init_devices(&mut board);
 
@@ -125,7 +126,7 @@ fn main() -> ! {
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
             if let Ok(rx_frame) = board.control_can().receive(fifo) {
                 brake.process_rx_frame(&rx_frame, &mut board);
-                throttle.process_rx_frame(&rx_frame, &mut board);
+                throttle.process_rx_frame(&rx_frame, &mut board.debug_console);
                 steering.process_rx_frame(&rx_frame, &mut board);
             }
         }

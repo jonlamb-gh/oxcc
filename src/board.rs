@@ -66,9 +66,7 @@ pub struct Board {
     pub reset_conditions: ResetConditions,
     control_can: ControlCan,
     obd_can: ObdCan,
-    throttle_dac: ThrottleDac,
     steering_dac: SteeringDac,
-    throttle_pins: ThrottlePins,
     steering_pins: SteeringPins,
 }
 
@@ -309,7 +307,7 @@ impl FullBoard {
         }
     }
 
-    pub fn split_components(self) -> (Board, BrakeDac, BrakePins, BrakePedalPositionSensor, AcceleratorPositionSensor, TorqueSensor) {
+    pub fn split_components(self) -> (Board, BrakeDac, BrakePins, BrakePedalPositionSensor, AcceleratorPositionSensor, ThrottleDac, ThrottlePins, TorqueSensor) {
         let FullBoard {
             debug_console,
             leds,
@@ -343,15 +341,15 @@ impl FullBoard {
                 reset_conditions,
                 control_can,
                 obd_can,
-                throttle_dac,
                 steering_dac,
-                throttle_pins,
                 steering_pins,
             },
             brake_dac,
             brake_pins,
             brake_pedal_position_sensor,
             accelerator_position_sensor,
+            throttle_dac,
+            throttle_pins,
             torque_sensor
         )
     }
@@ -360,10 +358,6 @@ impl FullBoard {
 impl Board {
     pub fn user_button(&mut self) -> bool {
         self.user_button.is_high()
-    }
-
-    pub fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
-        &mut self.throttle_pins.spoof_enable
     }
 
     pub fn steering_spoof_enable(&mut self) -> &mut SteeringSpoofEnablePin {
@@ -376,10 +370,6 @@ impl Board {
 
     pub fn obd_can(&mut self) -> &mut ObdCan {
         &mut self.obd_can
-    }
-
-    pub fn throttle_dac(&mut self) -> &mut ThrottleDac {
-        &mut self.throttle_dac
     }
 
     pub fn steering_dac(&mut self) -> &mut SteeringDac {

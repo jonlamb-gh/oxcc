@@ -6,11 +6,13 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
+use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
 use throttle_can_protocol::*;
+use types::*;
 use vehicle::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
@@ -38,10 +40,12 @@ pub struct ThrottleModule {
     operator_override_state: FaultCondition,
     throttle_report: OsccThrottleReport,
     fault_report_frame: OsccFaultReportFrame,
+    throttle_dac: ThrottleDac,
+    throttle_pins: ThrottlePins,
 }
 
 impl ThrottleModule {
-    pub fn new(accelerator_position_sensor: AcceleratorPositionSensor) -> Self {
+    pub fn new(accelerator_position_sensor: AcceleratorPositionSensor, throttle_dac: ThrottleDac, throttle_pins: ThrottlePins) -> Self {
         ThrottleModule {
             accelerator_position: DualSignal::new(
                 0,
@@ -53,50 +57,51 @@ impl ThrottleModule {
             operator_override_state: FaultCondition::new(),
             throttle_report: OsccThrottleReport::new(),
             fault_report_frame: OsccFaultReportFrame::new(),
+            throttle_dac,
+            throttle_pins
         }
     }
 
-    pub fn init_devices(&self, board: &mut Board) {
-        board.throttle_spoof_enable().set_low();
+    pub fn init_devices(&mut self) {
+        self.throttle_spoof_enable().set_low();
     }
 
-    pub fn disable_control(&mut self, board: &mut Board) {
+    pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.accelerator_position
                 .prevent_signal_discontinuity();
 
-            board.throttle_dac().output_ab(
+            self.throttle_dac.output_ab(
                 self.accelerator_position.low(),
                 self.accelerator_position.high(),
             );
 
-            board.throttle_spoof_enable().set_low();
+            self.throttle_spoof_enable().set_low();
             self.control_state.enabled = false;
-            writeln!(board.debug_console, "Throttle control disabled");
+            writeln!(debug_console, "Throttle control disabled");
         }
     }
 
-    pub fn enable_control(&mut self, board: &mut Board) {
+    pub fn enable_control(&mut self, debug_console: &mut DebugConsole) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.accelerator_position
                 .prevent_signal_discontinuity();
 
-            board.throttle_dac().output_ab(
+            self.throttle_dac.output_ab(
                 self.accelerator_position.low(),
                 self.accelerator_position.high(),
             );
 
-            board.throttle_spoof_enable().set_high();
+            self.throttle_spoof_enable().set_high();
             self.control_state.enabled = true;
-            writeln!(board.debug_console, "Throttle control enabled");
+            writeln!(debug_console, "Throttle control enabled");
         }
     }
 
     pub fn update_throttle(
         &mut self,
         spoof_command_high: u16,
-        spoof_command_low: u16,
-        board: &mut Board,
+        spoof_command_low: u16
     ) {
         if self.control_state.enabled {
             let spoof_high = num::clamp(
@@ -112,7 +117,7 @@ impl ThrottleModule {
             );
 
             // TODO - revisit this, enforce high->A, low->B
-            board.throttle_dac().output_ab(spoof_high, spoof_low);
+            self.throttle_dac.output_ab(spoof_high, spoof_low);
         }
     }
 
@@ -137,7 +142,7 @@ impl ThrottleModule {
 
             // sensor pins tied to ground - a value of zero indicates disconnection
             if inputs_grounded {
-                self.disable_control(board);
+                self.disable_control(&mut board.debug_console);
 
                 self.control_state
                     .dtcs
@@ -156,7 +161,7 @@ impl ThrottleModule {
                 // but brake and steering do?
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
-                self.disable_control(board);
+                self.disable_control(&mut board.debug_console);
 
                 self.control_state
                     .dtcs
@@ -190,36 +195,36 @@ impl ThrottleModule {
     }
 
     // TODO - error handling
-    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, board: &mut Board) {
+    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, debug_console: &mut DebugConsole) {
         if let CanFrame::DataFrame(ref frame) = can_frame {
             let id: u32 = frame.id().into();
             let data = frame.data();
 
             if (data[0] == OSCC_MAGIC_BYTE_0) && (data[1] == OSCC_MAGIC_BYTE_1) {
                 if id == OSCC_THROTTLE_ENABLE_CAN_ID.into() {
-                    self.enable_control(board);
+                    self.enable_control(debug_console);
                 } else if id == OSCC_THROTTLE_DISABLE_CAN_ID.into() {
-                    self.disable_control(board);
+                    self.disable_control(debug_console);
                 } else if id == OSCC_THROTTLE_COMMAND_CAN_ID.into() {
-                    self.process_throttle_command(&OsccThrottleCommand::from(frame), board);
+                    self.process_throttle_command(&OsccThrottleCommand::from(frame));
                 } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
-                    self.process_fault_report(&OsccFaultReport::from(frame), board);
+                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console);
                 }
             }
         }
     }
 
-    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, board: &mut Board) {
-        self.disable_control(board);
+    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, debug_console: &mut DebugConsole) {
+        self.disable_control(debug_console);
 
         writeln!(
-            board.debug_console,
+            debug_console,
             "Fault report received from: {} DTCs: {}",
             fault_report.fault_origin_id, fault_report.dtcs
         );
     }
 
-    fn process_throttle_command(&mut self, command: &OsccThrottleCommand, board: &mut Board) {
+    fn process_throttle_command(&mut self, command: &OsccThrottleCommand) {
         let clamped_position = num::clamp(
             command.torque_request,
             MINIMUM_THROTTLE_COMMAND,
@@ -241,10 +246,14 @@ impl ThrottleModule {
         let spoof_value_low = (STEPS_PER_VOLT * spoof_voltage_low) as u16;
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
-        self.update_throttle(spoof_value_high, spoof_value_low, board);
+        self.update_throttle(spoof_value_high, spoof_value_low);
     }
 
     fn read_accelerator_position_sensor(&mut self) {
         self.accelerator_position.update();
+    }
+
+    fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
+        &mut self.throttle_pins.spoof_enable
     }
 }
