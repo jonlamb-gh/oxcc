@@ -13,6 +13,7 @@ use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
 use vehicle::*;
+use super::types::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
 
@@ -39,10 +40,12 @@ pub struct BrakeModule {
     operator_override_state: FaultCondition,
     brake_report: OsccBrakeReport,
     fault_report_frame: OsccFaultReportFrame,
+    brake_dac: BrakeDac,
+    brake_pins: BrakePins,
 }
 
 impl BrakeModule {
-    pub fn new() -> Self {
+    pub fn new(brake_dac:BrakeDac, brake_pins:BrakePins) -> Self {
         BrakeModule {
             brake_pedal_position: DualSignal::new(
                 0,
@@ -55,12 +58,26 @@ impl BrakeModule {
             operator_override_state: FaultCondition::new(),
             brake_report: OsccBrakeReport::new(),
             fault_report_frame: OsccFaultReportFrame::new(),
+            brake_dac,
+            brake_pins
         }
     }
 
-    pub fn init_devices(&self, board: &mut Board) {
-        board.brake_spoof_enable().set_low();
-        board.brake_light_enable().set_low();
+    pub fn init_devices(&mut self) {
+        self.brake_spoof_enable().set_low();
+        self.brake_light_enable().set_low();
+    }
+
+    fn brake_spoof_enable(&mut self) -> &mut BrakeSpoofEnablePin {
+        &mut self.brake_pins.spoof_enable
+    }
+
+    fn brake_light_enable(&mut self) -> &mut BrakeLightEnablePin {
+        &mut self.brake_pins.brake_light_enable
+    }
+
+    pub fn brake_dac(&mut self) -> &mut BrakeDac {
+        &mut self.brake_dac
     }
 
     pub fn disable_control(&mut self, board: &mut Board) {
@@ -68,13 +85,12 @@ impl BrakeModule {
             self.brake_pedal_position
                 .prevent_signal_discontinuity(board);
 
-            board.brake_dac().output_ab(
-                self.brake_pedal_position.dac_output_a(),
-                self.brake_pedal_position.dac_output_b(),
-            );
+            let a = self.brake_pedal_position.dac_output_a();
+            let b = self.brake_pedal_position.dac_output_b();
+            self.brake_dac().output_ab(a, b);
 
-            board.brake_spoof_enable().set_low();
-            board.brake_light_enable().set_low();
+            self.brake_spoof_enable().set_low();
+            self.brake_light_enable().set_low();
             self.control_state.enabled = false;
             writeln!(board.debug_console, "Brake control disabled");
         }
@@ -85,12 +101,11 @@ impl BrakeModule {
             self.brake_pedal_position
                 .prevent_signal_discontinuity(board);
 
-            board.brake_dac().output_ab(
-                self.brake_pedal_position.dac_output_a(),
-                self.brake_pedal_position.dac_output_b(),
-            );
+            let a = self.brake_pedal_position.dac_output_a();
+            let b = self.brake_pedal_position.dac_output_b();
+            self.brake_dac().output_ab(a, b);
 
-            board.brake_spoof_enable().set_high();
+            self.brake_spoof_enable().set_high();
             self.control_state.enabled = true;
             writeln!(board.debug_console, "Brake control enabled");
         }
@@ -100,7 +115,6 @@ impl BrakeModule {
         &mut self,
         spoof_command_high: u16,
         spoof_command_low: u16,
-        board: &mut Board,
     ) {
         if self.control_state.enabled {
             let spoof_high = num::clamp(
@@ -118,13 +132,13 @@ impl BrakeModule {
             if (spoof_high > BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
                 || (spoof_low > BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
             {
-                board.brake_light_enable().set_high();
+                self.brake_light_enable().set_high();
             } else {
-                board.brake_light_enable().set_low();
+                self.brake_light_enable().set_low();
             }
 
             // TODO - revisit this, enforce high->A, low->B
-            board.brake_dac().output_ab(spoof_high, spoof_low);
+            self.brake_dac().output_ab(spoof_high, spoof_low);
         }
     }
 
@@ -207,7 +221,7 @@ impl BrakeModule {
                 } else if id == OSCC_BRAKE_DISABLE_CAN_ID.into() {
                     self.disable_control(board);
                 } else if id == OSCC_BRAKE_COMMAND_CAN_ID.into() {
-                    self.process_brake_command(&OsccBrakeCommand::from(frame), board);
+                    self.process_brake_command(&OsccBrakeCommand::from(frame));
                 } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
                     self.process_fault_report(&OsccFaultReport::from(frame), board);
                 }
@@ -225,7 +239,7 @@ impl BrakeModule {
         );
     }
 
-    fn process_brake_command(&mut self, command: &OsccBrakeCommand, board: &mut Board) {
+    fn process_brake_command(&mut self, command: &OsccBrakeCommand) {
         let clamped_position = num::clamp(
             command.pedal_command,
             MINIMUM_BRAKE_COMMAND,
@@ -247,7 +261,7 @@ impl BrakeModule {
         let spoof_value_low = (STEPS_PER_VOLT * spoof_voltage_low) as u16;
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
-        self.update_brake(spoof_value_high, spoof_value_low, board);
+        self.update_brake(spoof_value_high, spoof_value_low);
     }
 
     fn read_brake_pedal_position_sensor(&mut self, board: &mut Board) {
