@@ -153,7 +153,15 @@ impl SteeringModule {
                 self.publish_fault_report(board);
 
                 writeln!(board.debug_console, "Bad value read from torque sensor");
-            } else if self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD {
+            } else if (self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD)
+                && !self.control_state.operator_override
+            {
+                // TODO - oxcc change, don't continously disable when override is already
+                // handled oscc throttle module doesn't allow for continious
+                // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
+                // but brake and steering do?
+                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
+                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
                 self.disable_control(board);
 
                 self.control_state

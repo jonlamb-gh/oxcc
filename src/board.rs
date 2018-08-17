@@ -8,7 +8,7 @@ use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
 use nucleo_f767zi::hal::can::Can;
 use nucleo_f767zi::hal::delay::Delay;
-use nucleo_f767zi::hal::iwdg::{Iwdg, Prescaler};
+use nucleo_f767zi::hal::iwdg::{Iwdg, IwdgConfig, WatchdogTimeout};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::rcc::ResetConditions;
 use nucleo_f767zi::hal::serial::Serial;
@@ -285,8 +285,10 @@ impl FullBoard {
                 clocks,
                 &mut rcc.apb1,
             ),
-            // TODO - use LSI oscillator frequency to get units in time
-            wdg: Iwdg::new(peripherals.IWDG, Prescaler::Prescaler16),
+            wdg: Iwdg::new(
+                peripherals.IWDG,
+                IwdgConfig::from(WatchdogTimeout::Wdto50ms),
+            ),
             reset_conditions,
             control_can,
             obd_can,
@@ -322,33 +324,35 @@ impl FullBoard {
             throttle_pins,
             steering_pins,
         } = self;
-        (Board {
-            debug_console,
-            leds,
-            user_button,
-            delay,
-            timer_ms,
-            can_publish_timer,
-            wdg,
-            reset_conditions,
-            control_can,
-            obd_can,
-            adc1,
-            adc3,
-            throttle_dac,
-            steering_dac,
-            throttle_pins,
-            steering_pins,
-        }, brake_dac, brake_pins)
+        (
+            Board {
+                debug_console,
+                leds,
+                user_button,
+                delay,
+                timer_ms,
+                can_publish_timer,
+                wdg,
+                reset_conditions,
+                control_can,
+                obd_can,
+                adc1,
+                adc3,
+                throttle_dac,
+                steering_dac,
+                throttle_pins,
+                steering_pins,
+            },
+            brake_dac,
+            brake_pins,
+        )
     }
 }
 
 impl Board {
-
     pub fn user_button(&mut self) -> bool {
         self.user_button.is_high()
     }
-
 
     pub fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
         &mut self.throttle_pins.spoof_enable
