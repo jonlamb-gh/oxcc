@@ -1,8 +1,7 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/brake/kia_soul_ev_niro
 
 use super::types::*;
-use adc_signal::AdcSignal;
-use board::Board;
+use board::{Board, BrakePedalPositionSensor};
 use brake_can_protocol::*;
 use core::fmt::Write;
 use dtc::DtcBitfield;
@@ -34,7 +33,7 @@ impl BrakeControlState {
 }
 
 pub struct BrakeModule {
-    brake_pedal_position: DualSignal,
+    brake_pedal_position: DualSignal<BrakePedalPositionSensor>,
     control_state: BrakeControlState,
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
@@ -45,13 +44,12 @@ pub struct BrakeModule {
 }
 
 impl BrakeModule {
-    pub fn new(brake_dac: BrakeDac, brake_pins: BrakePins) -> Self {
+    pub fn new(brake_dac: BrakeDac, brake_pins: BrakePins, brake_pedal_position_sensor: BrakePedalPositionSensor) -> Self {
         BrakeModule {
             brake_pedal_position: DualSignal::new(
                 0,
                 0,
-                AdcSignal::BrakePedalPositionSensorHigh,
-                AdcSignal::BrakePedalPositionSensorLow,
+                brake_pedal_position_sensor,
             ),
             control_state: BrakeControlState::new(),
             grounded_fault_state: FaultCondition::new(),
@@ -83,10 +81,10 @@ impl BrakeModule {
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
             self.brake_pedal_position
-                .prevent_signal_discontinuity(board);
+                .prevent_signal_discontinuity();
 
-            let a = self.brake_pedal_position.dac_output_a();
-            let b = self.brake_pedal_position.dac_output_b();
+            let a = self.brake_pedal_position.low();
+            let b = self.brake_pedal_position.high();
             self.brake_dac().output_ab(a, b);
 
             self.brake_spoof_enable().set_low();
@@ -99,10 +97,10 @@ impl BrakeModule {
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.brake_pedal_position
-                .prevent_signal_discontinuity(board);
+                .prevent_signal_discontinuity();
 
-            let a = self.brake_pedal_position.dac_output_a();
-            let b = self.brake_pedal_position.dac_output_b();
+            let a = self.brake_pedal_position.low();
+            let b = self.brake_pedal_position.high();
             self.brake_dac().output_ab(a, b);
 
             self.brake_spoof_enable().set_high();
@@ -140,7 +138,7 @@ impl BrakeModule {
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
-            self.read_brake_pedal_position_sensor(board);
+            self.brake_pedal_position.update();
 
             let brake_pedal_position_average = self.brake_pedal_position.average();
 
@@ -265,8 +263,9 @@ impl BrakeModule {
 
         self.update_brake(spoof_value_high, spoof_value_low);
     }
+}
 
-    fn read_brake_pedal_position_sensor(&mut self, board: &mut Board) {
-        self.brake_pedal_position.update(board);
-    }
+trait HighLowReader {
+    fn read_high(&self) -> u16;
+    fn read_low(&self) -> u16;
 }

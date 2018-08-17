@@ -1,7 +1,6 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/throttle
 
-use adc_signal::AdcSignal;
-use board::Board;
+use board::{AcceleratorPositionSensor, Board};
 use core::fmt::Write;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
@@ -33,7 +32,7 @@ impl ThrottleControlState {
 }
 
 pub struct ThrottleModule {
-    accelerator_position: DualSignal,
+    accelerator_position: DualSignal<AcceleratorPositionSensor>,
     control_state: ThrottleControlState,
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
@@ -42,13 +41,12 @@ pub struct ThrottleModule {
 }
 
 impl ThrottleModule {
-    pub fn new() -> Self {
+    pub fn new(accelerator_position_sensor: AcceleratorPositionSensor) -> Self {
         ThrottleModule {
             accelerator_position: DualSignal::new(
                 0,
                 0,
-                AdcSignal::AcceleratorPositionSensorHigh,
-                AdcSignal::AcceleratorPositionSensorLow,
+                accelerator_position_sensor,
             ),
             control_state: ThrottleControlState::new(),
             grounded_fault_state: FaultCondition::new(),
@@ -65,11 +63,11 @@ impl ThrottleModule {
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
             self.accelerator_position
-                .prevent_signal_discontinuity(board);
+                .prevent_signal_discontinuity();
 
             board.throttle_dac().output_ab(
-                self.accelerator_position.dac_output_a(),
-                self.accelerator_position.dac_output_b(),
+                self.accelerator_position.low(),
+                self.accelerator_position.high(),
             );
 
             board.throttle_spoof_enable().set_low();
@@ -81,11 +79,11 @@ impl ThrottleModule {
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.accelerator_position
-                .prevent_signal_discontinuity(board);
+                .prevent_signal_discontinuity();
 
             board.throttle_dac().output_ab(
-                self.accelerator_position.dac_output_a(),
-                self.accelerator_position.dac_output_b(),
+                self.accelerator_position.low(),
+                self.accelerator_position.high(),
             );
 
             board.throttle_spoof_enable().set_high();
@@ -120,7 +118,7 @@ impl ThrottleModule {
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
-            self.read_accelerator_position_sensor(board);
+            self.read_accelerator_position_sensor();
 
             let accelerator_position_average = self.accelerator_position.average();
 
@@ -246,7 +244,7 @@ impl ThrottleModule {
         self.update_throttle(spoof_value_high, spoof_value_low, board);
     }
 
-    fn read_accelerator_position_sensor(&mut self, board: &mut Board) {
-        self.accelerator_position.update(board);
+    fn read_accelerator_position_sensor(&mut self) {
+        self.accelerator_position.update();
     }
 }

@@ -2,14 +2,14 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/brake/kia_soul_petrol
 
 use super::types::*;
-use board::Board;
+use board::{Board, BrakePedalPositionSensor};
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 
 pub struct BrakeModule {}
 
 impl BrakeModule {
-    pub fn new(brake_dac: BrakeDac, brake_pins: BrakePins) -> Self {
+    pub fn new(brake_dac: BrakeDac, brake_pins: BrakePins, brake_pedal_position_sensor: BrakePedalPositionSensor) -> Self {
         panic!("TODO - Kia Soul Petrol brake module not implemented yet");
         BrakeModule {}
     }

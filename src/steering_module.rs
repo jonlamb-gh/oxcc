@@ -1,7 +1,6 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/steering
 
-use adc_signal::AdcSignal;
-use board::Board;
+use board::{Board, TorqueSensor};
 use core::fmt::Write;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
@@ -35,7 +34,7 @@ impl SteeringControlState {
 }
 
 pub struct SteeringModule {
-    steering_torque: DualSignal,
+    steering_torque: DualSignal<TorqueSensor>,
     control_state: SteeringControlState,
     grounded_fault_state: FaultCondition,
     filtered_diff: u16,
@@ -44,13 +43,12 @@ pub struct SteeringModule {
 }
 
 impl SteeringModule {
-    pub fn new() -> Self {
+    pub fn new(torque_sensor: TorqueSensor) -> Self {
         SteeringModule {
             steering_torque: DualSignal::new(
                 0,
                 0,
-                AdcSignal::TorqueSensorHigh,
-                AdcSignal::TorqueSensorLow,
+                torque_sensor,
             ),
             control_state: SteeringControlState::new(),
             grounded_fault_state: FaultCondition::new(),
@@ -66,11 +64,11 @@ impl SteeringModule {
 
     pub fn disable_control(&mut self, board: &mut Board) {
         if self.control_state.enabled {
-            self.steering_torque.prevent_signal_discontinuity(board);
+            self.steering_torque.prevent_signal_discontinuity();
 
             board.steering_dac().output_ab(
-                self.steering_torque.dac_output_a(),
-                self.steering_torque.dac_output_b(),
+                self.steering_torque.low(),
+                self.steering_torque.high(),
             );
 
             board.steering_spoof_enable().set_low();
@@ -81,11 +79,11 @@ impl SteeringModule {
 
     pub fn enable_control(&mut self, board: &mut Board) {
         if !self.control_state.enabled && !self.control_state.operator_override {
-            self.steering_torque.prevent_signal_discontinuity(board);
+            self.steering_torque.prevent_signal_discontinuity();
 
             board.steering_dac().output_ab(
-                self.steering_torque.dac_output_a(),
-                self.steering_torque.dac_output_b(),
+                self.steering_torque.low(),
+                self.steering_torque.high(),
             );
 
             board.steering_spoof_enable().set_high();
@@ -120,7 +118,7 @@ impl SteeringModule {
 
     pub fn check_for_faults(&mut self, board: &mut Board) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
-            self.read_torque_sensor(board);
+            self.read_torque_sensor();
 
             let unfiltered_diff = self.steering_torque.diff();
 
@@ -254,7 +252,7 @@ impl SteeringModule {
         self.update_steering(spoof_value_high, spoof_value_low, board);
     }
 
-    fn read_torque_sensor(&mut self, board: &mut Board) {
-        self.steering_torque.update(board);
+    fn read_torque_sensor(&mut self) {
+        self.steering_torque.update();
     }
 }
