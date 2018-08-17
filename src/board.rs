@@ -8,7 +8,7 @@ use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
 use nucleo_f767zi::hal::can::Can;
 use nucleo_f767zi::hal::delay::Delay;
-use nucleo_f767zi::hal::iwdg::{Iwdg, Prescaler};
+use nucleo_f767zi::hal::iwdg::{Iwdg, IwdgConfig, WatchdogTimeout};
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::hal::rcc::ResetConditions;
 use nucleo_f767zi::hal::serial::Serial;
@@ -285,8 +285,10 @@ impl FullBoard {
                 clocks,
                 &mut rcc.apb1,
             ),
-            // TODO - use LSI oscillator frequency to get units in time
-            wdg: Iwdg::new(peripherals.IWDG, 0xFF, Prescaler::Prescaler128),
+            wdg: Iwdg::new(
+                peripherals.IWDG,
+                IwdgConfig::from(WatchdogTimeout::Wdto50ms),
+            ),
             reset_conditions,
             control_can,
             obd_can,
