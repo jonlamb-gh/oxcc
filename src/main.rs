@@ -57,7 +57,7 @@ mod brake_module;
 #[path = "brake/kia_soul_petrol/brake_module.rs"]
 mod brake_module;
 
-use board::{hard_fault_indicator, Board};
+use board::{hard_fault_indicator, FullBoard};
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
@@ -73,7 +73,7 @@ entry!(main);
 fn main() -> ! {
     // once the organization is cleaned up, the entire board doesn't need to be
     // mutable let Board {mut leds, mut delay, ..} = Board::new();
-    let mut board = Board::new();
+    let (mut board, brake_dac, brake_pins) = FullBoard::new().split_brake_components();
 
     // turn on the blue LED
     board.leds[led::Color::Blue].on();
@@ -103,12 +103,12 @@ fn main() -> ! {
         }
     }
 
-    let mut brake = BrakeModule::new();
+    let mut brake = BrakeModule::new(brake_dac, brake_pins);
     let mut throttle = ThrottleModule::new();
     let mut steering = SteeringModule::new();
     let mut can_gateway = CanGatewayModule::new();
 
-    brake.init_devices(&mut board);
+    brake.init_devices();
     throttle.init_devices(&mut board);
     steering.init_devices(&mut board);
     can_gateway.init_devices(&mut board);

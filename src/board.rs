@@ -33,7 +33,7 @@ pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
 // single read with large Cycles480 sample time?
 pub const DAC_SAMPLE_AVERAGE_COUNT: u32 = 20;
 
-pub struct Board {
+pub struct FullBoard {
     pub debug_console: DebugConsole,
     pub leds: Leds,
     pub user_button: UserButtonPin,
@@ -54,7 +54,26 @@ pub struct Board {
     steering_pins: SteeringPins,
 }
 
-impl Board {
+pub struct Board {
+    pub debug_console: DebugConsole,
+    pub leds: Leds,
+    pub user_button: UserButtonPin,
+    pub delay: Delay,
+    pub timer_ms: MsTimer,
+    pub can_publish_timer: CanPublishTimer,
+    pub wdg: Iwdg<IWDG>,
+    pub reset_conditions: ResetConditions,
+    control_can: ControlCan,
+    obd_can: ObdCan,
+    adc1: Adc<ADC1>,
+    adc3: Adc<ADC3>,
+    throttle_dac: ThrottleDac,
+    steering_dac: SteeringDac,
+    throttle_pins: ThrottlePins,
+    steering_pins: SteeringPins,
+}
+
+impl FullBoard {
     pub fn new() -> Self {
         // read the RCC reset condition flags before anything else
         let reset_conditions = ResetConditions::read_and_clear();
@@ -252,7 +271,7 @@ impl Board {
             &mut rcc.apb1,
         );
 
-        Board {
+        FullBoard {
             debug_console: DebugConsole::new(serial),
             leds,
             user_button: gpioc
@@ -282,17 +301,54 @@ impl Board {
         }
     }
 
+    pub fn split_brake_components(self) -> (Board, BrakeDac, BrakePins) {
+        let FullBoard {
+            debug_console,
+            leds,
+            user_button,
+            delay,
+            timer_ms,
+            can_publish_timer,
+            wdg,
+            reset_conditions,
+            control_can,
+            obd_can,
+            adc1,
+            adc3,
+            brake_dac,
+            throttle_dac,
+            steering_dac,
+            brake_pins,
+            throttle_pins,
+            steering_pins,
+        } = self;
+        (Board {
+            debug_console,
+            leds,
+            user_button,
+            delay,
+            timer_ms,
+            can_publish_timer,
+            wdg,
+            reset_conditions,
+            control_can,
+            obd_can,
+            adc1,
+            adc3,
+            throttle_dac,
+            steering_dac,
+            throttle_pins,
+            steering_pins,
+        }, brake_dac, brake_pins)
+    }
+}
+
+impl Board {
+
     pub fn user_button(&mut self) -> bool {
         self.user_button.is_high()
     }
 
-    pub fn brake_spoof_enable(&mut self) -> &mut BrakeSpoofEnablePin {
-        &mut self.brake_pins.spoof_enable
-    }
-
-    pub fn brake_light_enable(&mut self) -> &mut BrakeLightEnablePin {
-        &mut self.brake_pins.brake_light_enable
-    }
 
     pub fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
         &mut self.throttle_pins.spoof_enable
@@ -308,10 +364,6 @@ impl Board {
 
     pub fn obd_can(&mut self) -> &mut ObdCan {
         &mut self.obd_can
-    }
-
-    pub fn brake_dac(&mut self) -> &mut BrakeDac {
-        &mut self.brake_dac
     }
 
     pub fn throttle_dac(&mut self) -> &mut ThrottleDac {
