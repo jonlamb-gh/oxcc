@@ -14,7 +14,7 @@ use nucleo_f767zi::hal::rcc::ResetConditions;
 use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::spi::Spi;
 use nucleo_f767zi::hal::stm32f7x7;
-use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC3, IWDG};
+use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
 
@@ -45,6 +45,7 @@ pub struct FullBoard {
     control_can: ControlCan,
     obd_can: ObdCan,
     adc1: Adc<ADC1>,
+    adc2: Adc<ADC2>,
     adc3: Adc<ADC3>,
     brake_dac: BrakeDac,
     throttle_dac: ThrottleDac,
@@ -66,6 +67,7 @@ pub struct Board {
     control_can: ControlCan,
     obd_can: ObdCan,
     adc1: Adc<ADC1>,
+    adc2: Adc<ADC2>,
     adc3: Adc<ADC3>,
     throttle_dac: ThrottleDac,
     steering_dac: SteeringDac,
@@ -103,12 +105,12 @@ impl FullBoard {
             brake_light_enable: gpiod
                 .pd13
                 .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
-            pedal_pos_sensor_high: gpiof
-                .pf5
-                .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
-            pedal_pos_sensor_low: gpiof
-                .pf10
-                .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
+            pedal_pos_sensor_high: gpioa
+                .pa3
+                .into_analog_input(&mut gpioa.moder, &mut gpioa.pupdr),
+            pedal_pos_sensor_low: gpioc
+                .pc0
+                .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr),
         };
 
         // TODO - move these once DAC impl is ready
@@ -123,12 +125,12 @@ impl FullBoard {
             spoof_enable: gpiod
                 .pd10
                 .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
-            accel_pos_sensor_high: gpioa
-                .pa3
-                .into_analog_input(&mut gpioa.moder, &mut gpioa.pupdr),
-            accel_pos_sensor_low: gpioc
-                .pc0
+            accel_pos_sensor_high: gpioc
+                .pc3
                 .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr),
+            accel_pos_sensor_low: gpiob
+                .pb1
+                .into_analog_input(&mut gpiob.moder, &mut gpiob.pupdr),
         };
 
         let throttle_sck: ThrottleSpiSckPin =
@@ -145,11 +147,11 @@ impl FullBoard {
             spoof_enable: gpiod
                 .pd11
                 .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
-            torque_sensor_high: gpioc
-                .pc3
-                .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr),
+            torque_sensor_high: gpiof
+                .pf5
+                .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
             torque_sensor_low: gpiof
-                .pf3
+                .pf10
                 .into_analog_input(&mut gpiof.moder, &mut gpiof.pupdr),
         };
 
@@ -293,6 +295,7 @@ impl FullBoard {
             control_can,
             obd_can,
             adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2),
+            adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2),
             adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2),
             brake_dac: Mcp4922::new(brake_spi, brake_nss),
             throttle_dac: Mcp4922::new(throttle_spi, throttle_nss),
@@ -316,6 +319,7 @@ impl FullBoard {
             control_can,
             obd_can,
             adc1,
+            adc2,
             adc3,
             brake_dac,
             throttle_dac,
@@ -337,6 +341,7 @@ impl FullBoard {
                 control_can,
                 obd_can,
                 adc1,
+                adc2,
                 adc3,
                 throttle_dac,
                 steering_dac,
@@ -381,12 +386,12 @@ impl Board {
     pub fn analog_read(&mut self, signal: AdcSignal, sample_time: AdcSampleTime) -> u16 {
         let channel = AdcChannel::from(signal);
         match signal {
-            AdcSignal::AcceleratorPositionSensorHigh => self.adc1.read(channel, sample_time),
-            AdcSignal::AcceleratorPositionSensorLow => self.adc1.read(channel, sample_time),
-            AdcSignal::TorqueSensorHigh => self.adc1.read(channel, sample_time),
+            AdcSignal::BrakePedalPositionSensorHigh => self.adc1.read(channel, sample_time),
+            AdcSignal::BrakePedalPositionSensorLow => self.adc1.read(channel, sample_time),
+            AdcSignal::AcceleratorPositionSensorHigh => self.adc2.read(channel, sample_time),
+            AdcSignal::AcceleratorPositionSensorLow => self.adc2.read(channel, sample_time),
+            AdcSignal::TorqueSensorHigh => self.adc3.read(channel, sample_time),
             AdcSignal::TorqueSensorLow => self.adc3.read(channel, sample_time),
-            AdcSignal::BrakePedalPositionSensorHigh => self.adc3.read(channel, sample_time),
-            AdcSignal::BrakePedalPositionSensorLow => self.adc3.read(channel, sample_time),
         }
     }
 }
