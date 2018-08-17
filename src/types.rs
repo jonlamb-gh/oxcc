@@ -9,8 +9,8 @@ use nucleo_f767zi::hal::spi::Spi;
 use nucleo_f767zi::hal::stm32f7x7::{CAN1, CAN2, SPI1, SPI2, SPI3, TIM2};
 use nucleo_f767zi::hal::timer::Timer;
 use nucleo_f767zi::{
-    AnalogInput0Pin, AnalogInput1Pin, AnalogInput2Pin, AnalogInput3Pin, AnalogInput4Pin,
-    AnalogInput5Pin,
+    AnalogInput0Pin, AnalogInput1Pin, AnalogInput2Pin, AnalogInput4Pin, AnalogInput5Pin,
+    AnalogInput6Pin,
 };
 
 pub type CanPublishTimer = Timer<TIM2>;
@@ -24,8 +24,9 @@ pub type SteeringSpi = Spi<SPI3, (PC10<AF5>, PC11<AF5>, PC12<AF5>)>;
 
 pub type BrakeSpoofEnablePin = PD12<Output<PushPull>>;
 pub type BrakeLightEnablePin = PD13<Output<PushPull>>;
-pub type BrakePedalPositionSensorHighPin = AnalogInput4Pin;
-pub type BrakePedalPositionSensorLowPin = AnalogInput5Pin;
+// AIN pins chosen to allow brake module to own ADC1
+pub type BrakePedalPositionSensorHighPin = AnalogInput0Pin;
+pub type BrakePedalPositionSensorLowPin = AnalogInput1Pin;
 pub type BrakeSpiSckPin = PA5<AF5>;
 pub type BrakeSpiMisoPin = PA6<AF5>;
 pub type BrakeSpiMosiPin = PA7<AF5>;
@@ -34,8 +35,9 @@ pub type BrakeSpiNssPin = PA4<Output<PushPull>>;
 pub type BrakeDac = Mcp4922<BrakeSpi, BrakeSpiNssPin>;
 
 pub type ThrottleSpoofEnablePin = PD10<Output<PushPull>>;
-pub type AcceleratorPositionSensorHighPin = AnalogInput0Pin;
-pub type AcceleratorPositionSensorLowPin = AnalogInput1Pin;
+// AIN pins chosen to allow throttle module to own ADC2
+pub type AcceleratorPositionSensorHighPin = AnalogInput2Pin;
+pub type AcceleratorPositionSensorLowPin = AnalogInput6Pin;
 pub type ThrottleSpiSckPin = PB10<AF5>;
 pub type ThrottleSpiMisoPin = PC2<AF5>;
 pub type ThrottleSpiMosiPin = PB15<AF5>;
@@ -44,8 +46,9 @@ pub type ThrottleSpiNssPin = PB4<Output<PushPull>>;
 pub type ThrottleDac = Mcp4922<ThrottleSpi, ThrottleSpiNssPin>;
 
 pub type SteeringSpoofEnablePin = PD11<Output<PushPull>>;
-pub type TorqueSensorHighPin = AnalogInput2Pin;
-pub type TorqueSensorLowPin = AnalogInput3Pin;
+// AIN pins chosen to allow steering module to own ADC3
+pub type TorqueSensorHighPin = AnalogInput4Pin;
+pub type TorqueSensorLowPin = AnalogInput5Pin;
 pub type SteeringSpiSckPin = PC10<AF5>;
 pub type SteeringSpiMisoPin = PC11<AF5>;
 pub type SteeringSpiMosiPin = PC12<AF5>;
