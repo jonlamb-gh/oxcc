@@ -18,7 +18,6 @@ sudo apt-get install gcc-arm-none-eabi
 ```
 
 ```bash
-# rustc 1.29.0-nightly (54628c8ea 2018-07-30)
 cargo build
 ```
 
