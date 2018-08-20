@@ -81,6 +81,8 @@ fn main() -> ! {
         throttle_dac,
         throttle_pins,
         torque_sensor,
+        steering_dac,
+        steering_pins,
         timer_ms,
         mut debug_console,
     ) = FullBoard::new().split_components();
@@ -116,12 +118,12 @@ fn main() -> ! {
     let mut brake = BrakeModule::new(brake_dac, brake_pins, brake_pedal_position_sensor);
     let mut throttle =
         ThrottleModule::new(accelerator_position_sensor, throttle_dac, throttle_pins);
-    let mut steering = SteeringModule::new(torque_sensor);
+    let mut steering = SteeringModule::new(torque_sensor, steering_dac, steering_pins);
     let mut can_gateway = CanGatewayModule::new();
 
     brake.init_devices();
     throttle.init_devices();
-    steering.init_devices(&mut board);
+    steering.init_devices();
     can_gateway.init_devices(&mut board);
 
     // send reports immediately
@@ -138,7 +140,7 @@ fn main() -> ! {
             if let Ok(rx_frame) = board.control_can().receive(fifo) {
                 brake.process_rx_frame(&rx_frame, &mut debug_console);
                 throttle.process_rx_frame(&rx_frame, &mut debug_console);
-                steering.process_rx_frame(&rx_frame, &mut debug_console, &mut board);
+                steering.process_rx_frame(&rx_frame, &mut debug_console);
             }
         }
 
