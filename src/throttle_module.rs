@@ -18,25 +18,28 @@ use vehicle::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
 
-struct ThrottleControlState {
+struct ThrottleControlState<DTCS: DtcBitfield> {
     enabled: bool,
     operator_override: bool,
-    dtcs: u8,
+    dtcs: DTCS,
 }
 
-impl ThrottleControlState {
-    pub const fn new() -> Self {
+impl<DTCS> ThrottleControlState<DTCS>
+where
+    DTCS: DtcBitfield,
+{
+    pub const fn new(dtcs: DTCS) -> Self {
         ThrottleControlState {
             enabled: false,
             operator_override: false,
-            dtcs: 0,
+            dtcs: dtcs,
         }
     }
 }
 
 pub struct ThrottleModule {
     accelerator_position: DualSignal<AcceleratorPositionSensor>,
-    control_state: ThrottleControlState,
+    control_state: ThrottleControlState<u8>,
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
     throttle_report: OsccThrottleReport,
@@ -53,7 +56,7 @@ impl ThrottleModule {
     ) -> Self {
         ThrottleModule {
             accelerator_position: DualSignal::new(0, 0, accelerator_position_sensor),
-            control_state: ThrottleControlState::new(),
+            control_state: ThrottleControlState::new(u8::default()),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
             throttle_report: OsccThrottleReport::new(),
@@ -67,10 +70,10 @@ impl ThrottleModule {
     }
 
     pub fn init_devices(&mut self) {
-        self.throttle_spoof_enable().set_low();
+        self.throttle_pins.spoof_enable.set_low();
     }
 
-    pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
+    fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.accelerator_position.prevent_signal_discontinuity();
 
@@ -79,13 +82,13 @@ impl ThrottleModule {
                 self.accelerator_position.high(),
             );
 
-            self.throttle_spoof_enable().set_low();
+            self.throttle_pins.spoof_enable.set_low();
             self.control_state.enabled = false;
             writeln!(debug_console, "Throttle control disabled");
         }
     }
 
-    pub fn enable_control(&mut self, debug_console: &mut DebugConsole) {
+    fn enable_control(&mut self, debug_console: &mut DebugConsole) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.accelerator_position.prevent_signal_discontinuity();
 
@@ -94,13 +97,13 @@ impl ThrottleModule {
                 self.accelerator_position.high(),
             );
 
-            self.throttle_spoof_enable().set_high();
+            self.throttle_pins.spoof_enable.set_high();
             self.control_state.enabled = true;
             writeln!(debug_console, "Throttle control enabled");
         }
     }
 
-    pub fn update_throttle(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
+    fn update_throttle(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
             let spoof_high = num::clamp(
                 spoof_command_high,
@@ -119,74 +122,69 @@ impl ThrottleModule {
         }
     }
 
-    pub fn check_for_faults<P: FaultReportPublisher>(
+    /// Checks for any fresh (previously undetected or unhandled) faults
+    pub fn check_for_faults(
         &mut self,
         timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
-        fault_report_publisher: &mut P,
-    ) {
-        if self.control_state.enabled || self.control_state.dtcs > 0 {
-            self.read_accelerator_position_sensor();
+    ) -> Option<&OsccFaultReport> {
+        if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
+            // Assumes this module already went through the proper transition into a faulted
+            // and disabled state, and we do not want to double-report a possible duplicate fault.
+            return None;
+        }
 
-            let accelerator_position_average = self.accelerator_position.average();
+        self.accelerator_position.update();
 
-            let operator_overridden: bool =
-                self.operator_override_state.condition_exceeded_duration(
-                    accelerator_position_average >= ACCELERATOR_OVERRIDE_THRESHOLD,
-                    FAULT_HYSTERESIS,
-                    timer_ms,
-                );
+        let accelerator_position_average = self.accelerator_position.average();
 
-            let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
-                &self.accelerator_position,
-                FAULT_HYSTERESIS,
-                timer_ms,
+        let operator_overridden: bool = self.operator_override_state.condition_exceeded_duration(
+            accelerator_position_average >= ACCELERATOR_OVERRIDE_THRESHOLD,
+            FAULT_HYSTERESIS,
+            timer_ms,
+        );
+
+        let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
+            &self.accelerator_position,
+            FAULT_HYSTERESIS,
+            timer_ms,
+        );
+
+        // sensor pins tied to ground - a value of zero indicates disconnection
+        if inputs_grounded {
+            self.disable_control(debug_console);
+
+            self.control_state
+                .dtcs
+                .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
+
+            self.update_fault_report();
+            writeln!(
+                debug_console,
+                "Bad value read from accelerator position sensor"
             );
+            Some(&self.fault_report)
+        } else if operator_overridden && !self.control_state.operator_override {
+            // TODO - oxcc change, don't continously disable when override is already
+            // handled oscc throttle module doesn't allow for continious
+            // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
+            // but brake and steering do?
+            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
+            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
+            self.disable_control(debug_console);
 
-            // sensor pins tied to ground - a value of zero indicates disconnection
-            if inputs_grounded {
-                self.disable_control(debug_console);
+            self.control_state
+                .dtcs
+                .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
-                self.control_state
-                    .dtcs
-                    .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
-
-                if let Err(_) =
-                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
-                {
-                    // TODO - publish error handling
-                }
-
-                writeln!(
-                    debug_console,
-                    "Bad value read from accelerator position sensor"
-                );
-            } else if operator_overridden && !self.control_state.operator_override {
-                // TODO - oxcc change, don't continously disable when override is already
-                // handled oscc throttle module doesn't allow for continious
-                // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
-                // but brake and steering do?
-                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
-                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
-                self.disable_control(debug_console);
-
-                self.control_state
-                    .dtcs
-                    .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
-
-                if let Err(_) =
-                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
-                {
-                    // TODO - publish error handling
-                }
-
-                self.control_state.operator_override = true;
-
-                writeln!(debug_console, "Throttle operator override");
-            } else {
-                self.control_state.dtcs = 0;
-                self.control_state.operator_override = false;
-            }
+            self.update_fault_report();
+            self.control_state.operator_override = true;
+            writeln!(debug_console, "Throttle operator override");
+            Some(&self.fault_report)
+        } else {
+            self.control_state.dtcs.clear_all();
+            self.control_state.operator_override = false;
+            None
         }
     }
 
@@ -198,10 +196,8 @@ impl ThrottleModule {
         self.throttle_report.transmit(&mut board.control_can());
     }
 
-    fn supply_fault_report(&mut self) -> &OsccFaultReport {
-        self.fault_report.fault_origin_id = FAULT_ORIGIN_THROTTLE;
+    fn update_fault_report(&mut self) {
         self.fault_report.dtcs = self.control_state.dtcs;
-        &self.fault_report
     }
 
     // TODO - error handling
@@ -261,13 +257,5 @@ impl ThrottleModule {
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
         self.update_throttle(spoof_value_high, spoof_value_low);
-    }
-
-    fn read_accelerator_position_sensor(&mut self) {
-        self.accelerator_position.update();
-    }
-
-    fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
-        &mut self.throttle_pins.spoof_enable
     }
 }
