@@ -1,5 +1,5 @@
 use board::ControlCan;
-use nucleo_f767zi::hal::can::{BaseID, DataFrame, ID};
+use nucleo_f767zi::hal::can::{BaseID, CanError, DataFrame, ID};
 use oscc_magic_byte::*;
 
 pub const OSCC_FAULT_REPORT_CAN_ID: u16 = 0xAF;
@@ -26,6 +26,14 @@ impl OsccFaultReport {
     }
 }
 
+pub trait FaultReportSupplier {
+    fn supply_fault_report(&mut self) -> &OsccFaultReport;
+}
+
+pub trait FaultReportPublisher {
+    fn publish_fault_report(&mut self, fault_report: &OsccFaultReport) -> Result<(), CanError>;
+}
+
 // TODO - fix this organization
 pub struct OsccFaultReportFrame {
     can_frame: DataFrame,
@@ -49,15 +57,20 @@ impl<'a> From<&'a DataFrame> for OsccFaultReport {
     }
 }
 
+pub fn default_fault_report_data_frame() -> DataFrame {
+    DataFrame::new(ID::BaseID(BaseID::new(OSCC_FAULT_REPORT_CAN_ID)))
+}
+
 impl OsccFaultReportFrame {
     pub fn new() -> Self {
         OsccFaultReportFrame {
-            can_frame: DataFrame::new(ID::BaseID(BaseID::new(OSCC_FAULT_REPORT_CAN_ID))),
+            can_frame: default_fault_report_data_frame(),
             fault_report: OsccFaultReport::new(),
         }
     }
 
     // TODO - error handling
+    // TODO - replace with the publisher pattern more completely
     pub fn transmit(&mut self, can: &mut ControlCan) {
         self.update_can_frame();
 

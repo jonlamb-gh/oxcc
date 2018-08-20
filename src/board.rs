@@ -1,12 +1,13 @@
-use adc_signal::AdcSignal;
 use config;
 use cortex_m;
 use dac_mcp4922::Mcp4922;
 use dac_mcp4922::MODE as DAC_MODE;
+use dual_signal::HighLowReader;
+use fault_can_protocol::*;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
-use nucleo_f767zi::hal::can::Can;
+use nucleo_f767zi::hal::can::{Can, CanError, DataFrame};
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::iwdg::{Iwdg, IwdgConfig, WatchdogTimeout};
 use nucleo_f767zi::hal::prelude::*;
@@ -17,6 +18,7 @@ use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
+use oscc_magic_byte::*;
 
 pub use types::*;
 
@@ -44,9 +46,9 @@ pub struct FullBoard {
     pub reset_conditions: ResetConditions,
     control_can: ControlCan,
     obd_can: ObdCan,
-    adc1: Adc<ADC1>,
-    adc2: Adc<ADC2>,
-    adc3: Adc<ADC3>,
+    brake_pedal_position_sensor: BrakePedalPositionSensor,
+    accelerator_position_sensor: AcceleratorPositionSensor,
+    torque_sensor: TorqueSensor,
     brake_dac: BrakeDac,
     throttle_dac: ThrottleDac,
     steering_dac: SteeringDac,
@@ -56,23 +58,17 @@ pub struct FullBoard {
 }
 
 pub struct Board {
-    pub debug_console: DebugConsole,
     pub leds: Leds,
     pub user_button: UserButtonPin,
     pub delay: Delay,
-    pub timer_ms: MsTimer,
     pub can_publish_timer: CanPublishTimer,
     pub wdg: Iwdg<IWDG>,
     pub reset_conditions: ResetConditions,
     control_can: ControlCan,
     obd_can: ObdCan,
-    adc1: Adc<ADC1>,
-    adc2: Adc<ADC2>,
-    adc3: Adc<ADC3>,
-    throttle_dac: ThrottleDac,
     steering_dac: SteeringDac,
-    throttle_pins: ThrottlePins,
     steering_pins: SteeringPins,
+    fault_report_can_frame: DataFrame,
 }
 
 impl FullBoard {
@@ -294,9 +290,15 @@ impl FullBoard {
             reset_conditions,
             control_can,
             obd_can,
-            adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2),
-            adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2),
-            adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2),
+            brake_pedal_position_sensor: BrakePedalPositionSensor {
+                adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2),
+            },
+            accelerator_position_sensor: AcceleratorPositionSensor {
+                adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2),
+            },
+            torque_sensor: TorqueSensor {
+                adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2),
+            },
             brake_dac: Mcp4922::new(brake_spi, brake_nss),
             throttle_dac: Mcp4922::new(throttle_spi, throttle_nss),
             steering_dac: Mcp4922::new(steering_spi, steering_nss),
@@ -306,7 +308,20 @@ impl FullBoard {
         }
     }
 
-    pub fn split_brake_components(self) -> (Board, BrakeDac, BrakePins) {
+    pub fn split_components(
+        self,
+    ) -> (
+        Board,
+        BrakeDac,
+        BrakePins,
+        BrakePedalPositionSensor,
+        AcceleratorPositionSensor,
+        ThrottleDac,
+        ThrottlePins,
+        TorqueSensor,
+        MsTimer,
+        DebugConsole,
+    ) {
         let FullBoard {
             debug_console,
             leds,
@@ -318,9 +333,9 @@ impl FullBoard {
             reset_conditions,
             control_can,
             obd_can,
-            adc1,
-            adc2,
-            adc3,
+            brake_pedal_position_sensor,
+            accelerator_position_sensor,
+            torque_sensor,
             brake_dac,
             throttle_dac,
             steering_dac,
@@ -330,26 +345,27 @@ impl FullBoard {
         } = self;
         (
             Board {
-                debug_console,
                 leds,
                 user_button,
                 delay,
-                timer_ms,
                 can_publish_timer,
                 wdg,
                 reset_conditions,
                 control_can,
                 obd_can,
-                adc1,
-                adc2,
-                adc3,
-                throttle_dac,
                 steering_dac,
-                throttle_pins,
                 steering_pins,
+                fault_report_can_frame: default_fault_report_data_frame(),
             },
             brake_dac,
             brake_pins,
+            brake_pedal_position_sensor,
+            accelerator_position_sensor,
+            throttle_dac,
+            throttle_pins,
+            torque_sensor,
+            timer_ms,
+            debug_console,
         )
     }
 }
@@ -357,10 +373,6 @@ impl FullBoard {
 impl Board {
     pub fn user_button(&mut self) -> bool {
         self.user_button.is_high()
-    }
-
-    pub fn throttle_spoof_enable(&mut self) -> &mut ThrottleSpoofEnablePin {
-        &mut self.throttle_pins.spoof_enable
     }
 
     pub fn steering_spoof_enable(&mut self) -> &mut SteeringSpoofEnablePin {
@@ -375,24 +387,72 @@ impl Board {
         &mut self.obd_can
     }
 
-    pub fn throttle_dac(&mut self) -> &mut ThrottleDac {
-        &mut self.throttle_dac
-    }
-
     pub fn steering_dac(&mut self) -> &mut SteeringDac {
         &mut self.steering_dac
     }
+}
 
-    pub fn analog_read(&mut self, signal: AdcSignal, sample_time: AdcSampleTime) -> u16 {
-        let channel = AdcChannel::from(signal);
-        match signal {
-            AdcSignal::BrakePedalPositionSensorHigh => self.adc1.read(channel, sample_time),
-            AdcSignal::BrakePedalPositionSensorLow => self.adc1.read(channel, sample_time),
-            AdcSignal::AcceleratorPositionSensorHigh => self.adc2.read(channel, sample_time),
-            AdcSignal::AcceleratorPositionSensorLow => self.adc2.read(channel, sample_time),
-            AdcSignal::TorqueSensorHigh => self.adc3.read(channel, sample_time),
-            AdcSignal::TorqueSensorLow => self.adc3.read(channel, sample_time),
+// brake module owns ADC1
+pub struct BrakePedalPositionSensor {
+    adc1: Adc<ADC1>,
+}
+
+impl HighLowReader for BrakePedalPositionSensor {
+    fn read_high(&self) -> u16 {
+        self.adc1.read(AdcChannel::Adc123In3, ADC_SAMPLE_TIME)
+    }
+    fn read_low(&self) -> u16 {
+        self.adc1.read(AdcChannel::Adc123In10, ADC_SAMPLE_TIME)
+    }
+}
+
+// throttle module owns ADC2
+pub struct AcceleratorPositionSensor {
+    adc2: Adc<ADC2>,
+}
+
+impl HighLowReader for AcceleratorPositionSensor {
+    fn read_high(&self) -> u16 {
+        self.adc2.read(AdcChannel::Adc123In13, ADC_SAMPLE_TIME)
+    }
+    fn read_low(&self) -> u16 {
+        self.adc2.read(AdcChannel::Adc12In9, ADC_SAMPLE_TIME)
+    }
+}
+
+// steering module owns ADC3
+pub struct TorqueSensor {
+    adc3: Adc<ADC3>,
+}
+
+impl HighLowReader for TorqueSensor {
+    fn read_high(&self) -> u16 {
+        self.adc3.read(AdcChannel::Adc3In15, ADC_SAMPLE_TIME)
+    }
+    fn read_low(&self) -> u16 {
+        self.adc3.read(AdcChannel::Adc3In8, ADC_SAMPLE_TIME)
+    }
+}
+
+impl FaultReportPublisher for Board {
+    fn publish_fault_report(&mut self, fault_report: &OsccFaultReport) -> Result<(), CanError> {
+        {
+            self.fault_report_can_frame
+                .set_data_length(OSCC_FAULT_REPORT_CAN_DLC as _);
+
+            let data = self.fault_report_can_frame.data_as_mut();
+
+            data[0] = OSCC_MAGIC_BYTE_0;
+            data[1] = OSCC_MAGIC_BYTE_1;
+            data[2] = (fault_report.fault_origin_id & 0xFF) as _;
+            data[3] = ((fault_report.fault_origin_id >> 8) & 0xFF) as _;
+            data[4] = ((fault_report.fault_origin_id >> 16) & 0xFF) as _;
+            data[5] = ((fault_report.fault_origin_id >> 24) & 0xFF) as _;
+            data[6] = fault_report.dtcs;
         }
+
+        self.control_can
+            .transmit(&self.fault_report_can_frame.into())
     }
 }
 
