@@ -1,8 +1,8 @@
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.cpp
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.h#L19
 
-use ms_timer::MsTimer;
 use dual_signal::{DualSignal, HighLowReader};
+use ms_timer::MsTimer;
 
 pub struct FaultCondition {
     monitoring_active: bool,

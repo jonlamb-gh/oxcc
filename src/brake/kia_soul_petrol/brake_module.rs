@@ -9,7 +9,11 @@ use nucleo_f767zi::hal::prelude::*;
 pub struct BrakeModule {}
 
 impl BrakeModule {
-    pub fn new(brake_dac: BrakeDac, brake_pins: BrakePins, brake_pedal_position_sensor: BrakePedalPositionSensor) -> Self {
+    pub fn new(
+        brake_dac: BrakeDac,
+        brake_pins: BrakePins,
+        brake_pedal_position_sensor: BrakePedalPositionSensor,
+    ) -> Self {
         panic!("TODO - Kia Soul Petrol brake module not implemented yet");
         BrakeModule {}
     }

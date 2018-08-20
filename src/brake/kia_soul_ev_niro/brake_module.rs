@@ -46,13 +46,13 @@ pub struct BrakeModule {
 }
 
 impl BrakeModule {
-    pub fn new(brake_dac: BrakeDac, brake_pins: BrakePins, brake_pedal_position_sensor: BrakePedalPositionSensor) -> Self {
+    pub fn new(
+        brake_dac: BrakeDac,
+        brake_pins: BrakePins,
+        brake_pedal_position_sensor: BrakePedalPositionSensor,
+    ) -> Self {
         BrakeModule {
-            brake_pedal_position: DualSignal::new(
-                0,
-                0,
-                brake_pedal_position_sensor,
-            ),
+            brake_pedal_position: DualSignal::new(0, 0, brake_pedal_position_sensor),
             control_state: BrakeControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
@@ -82,8 +82,7 @@ impl BrakeModule {
 
     pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
-            self.brake_pedal_position
-                .prevent_signal_discontinuity();
+            self.brake_pedal_position.prevent_signal_discontinuity();
 
             let a = self.brake_pedal_position.low();
             let b = self.brake_pedal_position.high();
@@ -98,8 +97,7 @@ impl BrakeModule {
 
     pub fn enable_control(&mut self, debug_console: &mut DebugConsole) {
         if !self.control_state.enabled && !self.control_state.operator_override {
-            self.brake_pedal_position
-                .prevent_signal_discontinuity();
+            self.brake_pedal_position.prevent_signal_discontinuity();
 
             let a = self.brake_pedal_position.low();
             let b = self.brake_pedal_position.high();
@@ -138,7 +136,12 @@ impl BrakeModule {
         }
     }
 
-    pub fn check_for_faults(&mut self, timer_ms: &MsTimer, debug_console: &mut DebugConsole, board: &mut Board) {
+    pub fn check_for_faults(
+        &mut self,
+        timer_ms: &MsTimer,
+        debug_console: &mut DebugConsole,
+        board: &mut Board,
+    ) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.brake_pedal_position.update();
 
@@ -231,7 +234,11 @@ impl BrakeModule {
         }
     }
 
-    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, debug_console: &mut DebugConsole) {
+    fn process_fault_report(
+        &mut self,
+        fault_report: &OsccFaultReport,
+        debug_console: &mut DebugConsole,
+    ) {
         self.disable_control(debug_console);
 
         writeln!(

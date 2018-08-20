@@ -291,13 +291,13 @@ impl FullBoard {
             control_can,
             obd_can,
             brake_pedal_position_sensor: BrakePedalPositionSensor {
-                adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2)
+                adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2),
             },
             accelerator_position_sensor: AcceleratorPositionSensor {
-                adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2)
+                adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2),
             },
             torque_sensor: TorqueSensor {
-                adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2)
+                adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2),
             },
             brake_dac: Mcp4922::new(brake_spi, brake_nss),
             throttle_dac: Mcp4922::new(throttle_spi, throttle_nss),
@@ -308,9 +308,20 @@ impl FullBoard {
         }
     }
 
-    pub fn split_components(self) -> (Board, BrakeDac, BrakePins, BrakePedalPositionSensor,
-                                      AcceleratorPositionSensor, ThrottleDac, ThrottlePins,
-                                      TorqueSensor, MsTimer, DebugConsole) {
+    pub fn split_components(
+        self,
+    ) -> (
+        Board,
+        BrakeDac,
+        BrakePins,
+        BrakePedalPositionSensor,
+        AcceleratorPositionSensor,
+        ThrottleDac,
+        ThrottlePins,
+        TorqueSensor,
+        MsTimer,
+        DebugConsole,
+    ) {
         let FullBoard {
             debug_console,
             leds,
@@ -354,7 +365,7 @@ impl FullBoard {
             throttle_pins,
             torque_sensor,
             timer_ms,
-            debug_console
+            debug_console,
         )
     }
 }
@@ -383,7 +394,7 @@ impl Board {
 
 // brake module owns ADC1
 pub struct BrakePedalPositionSensor {
-    adc1: Adc<ADC1>
+    adc1: Adc<ADC1>,
 }
 
 impl HighLowReader for BrakePedalPositionSensor {
@@ -397,7 +408,7 @@ impl HighLowReader for BrakePedalPositionSensor {
 
 // throttle module owns ADC2
 pub struct AcceleratorPositionSensor {
-    adc2: Adc<ADC2>
+    adc2: Adc<ADC2>,
 }
 
 impl HighLowReader for AcceleratorPositionSensor {
@@ -411,7 +422,7 @@ impl HighLowReader for AcceleratorPositionSensor {
 
 // steering module owns ADC3
 pub struct TorqueSensor {
-    adc3: Adc<ADC3>
+    adc3: Adc<ADC3>,
 }
 
 impl HighLowReader for TorqueSensor {
@@ -440,7 +451,8 @@ impl FaultReportPublisher for Board {
             data[6] = fault_report.dtcs;
         }
 
-        self.control_can.transmit(&self.fault_report_can_frame.into())
+        self.control_can
+            .transmit(&self.fault_report_can_frame.into())
     }
 }
 

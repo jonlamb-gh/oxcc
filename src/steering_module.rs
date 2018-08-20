@@ -7,8 +7,8 @@ use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
 use ms_timer::MsTimer;
-use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::debug_console::DebugConsole;
+use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
@@ -47,11 +47,7 @@ pub struct SteeringModule {
 impl SteeringModule {
     pub fn new(torque_sensor: TorqueSensor) -> Self {
         SteeringModule {
-            steering_torque: DualSignal::new(
-                0,
-                0,
-                torque_sensor,
-            ),
+            steering_torque: DualSignal::new(0, 0, torque_sensor),
             control_state: SteeringControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             filtered_diff: 0,
@@ -68,10 +64,9 @@ impl SteeringModule {
         if self.control_state.enabled {
             self.steering_torque.prevent_signal_discontinuity();
 
-            board.steering_dac().output_ab(
-                self.steering_torque.low(),
-                self.steering_torque.high(),
-            );
+            board
+                .steering_dac()
+                .output_ab(self.steering_torque.low(), self.steering_torque.high());
 
             board.steering_spoof_enable().set_low();
             self.control_state.enabled = false;
@@ -83,10 +78,9 @@ impl SteeringModule {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.steering_torque.prevent_signal_discontinuity();
 
-            board.steering_dac().output_ab(
-                self.steering_torque.low(),
-                self.steering_torque.high(),
-            );
+            board
+                .steering_dac()
+                .output_ab(self.steering_torque.low(), self.steering_torque.high());
 
             board.steering_spoof_enable().set_high();
             self.control_state.enabled = true;
@@ -118,7 +112,12 @@ impl SteeringModule {
         }
     }
 
-    pub fn check_for_faults(&mut self, timer_ms: &MsTimer, debug_console: &mut DebugConsole, board: &mut Board) {
+    pub fn check_for_faults(
+        &mut self,
+        timer_ms: &MsTimer,
+        debug_console: &mut DebugConsole,
+        board: &mut Board,
+    ) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.read_torque_sensor();
 
@@ -200,7 +199,12 @@ impl SteeringModule {
     }
 
     // TODO - error handling
-    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, debug_console: &mut DebugConsole, board: &mut Board) {
+    pub fn process_rx_frame(
+        &mut self,
+        can_frame: &CanFrame,
+        debug_console: &mut DebugConsole,
+        board: &mut Board,
+    ) {
         if let CanFrame::DataFrame(ref frame) = can_frame {
             let id: u32 = frame.id().into();
             let data = frame.data();
@@ -219,7 +223,12 @@ impl SteeringModule {
         }
     }
 
-    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, debug_console: &mut DebugConsole, board: &mut Board) {
+    fn process_fault_report(
+        &mut self,
+        fault_report: &OsccFaultReport,
+        debug_console: &mut DebugConsole,
+        board: &mut Board,
+    ) {
         self.disable_control(debug_console, board);
 
         writeln!(

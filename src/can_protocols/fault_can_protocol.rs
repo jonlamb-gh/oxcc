@@ -34,7 +34,6 @@ pub trait FaultReportPublisher {
     fn publish_fault_report(&mut self, fault_report: &OsccFaultReport) -> Result<(), CanError>;
 }
 
-
 // TODO - fix this organization
 pub struct OsccFaultReportFrame {
     can_frame: DataFrame,

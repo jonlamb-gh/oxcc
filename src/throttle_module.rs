@@ -46,23 +46,23 @@ pub struct ThrottleModule {
 }
 
 impl ThrottleModule {
-    pub fn new(accelerator_position_sensor: AcceleratorPositionSensor, throttle_dac: ThrottleDac, throttle_pins: ThrottlePins) -> Self {
+    pub fn new(
+        accelerator_position_sensor: AcceleratorPositionSensor,
+        throttle_dac: ThrottleDac,
+        throttle_pins: ThrottlePins,
+    ) -> Self {
         ThrottleModule {
-            accelerator_position: DualSignal::new(
-                0,
-                0,
-                accelerator_position_sensor,
-            ),
+            accelerator_position: DualSignal::new(0, 0, accelerator_position_sensor),
             control_state: ThrottleControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
             throttle_report: OsccThrottleReport::new(),
             fault_report: OsccFaultReport {
                 fault_origin_id: FAULT_ORIGIN_THROTTLE,
-                dtcs: 0
+                dtcs: 0,
             },
             throttle_dac,
-            throttle_pins
+            throttle_pins,
         }
     }
 
@@ -72,8 +72,7 @@ impl ThrottleModule {
 
     pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
-            self.accelerator_position
-                .prevent_signal_discontinuity();
+            self.accelerator_position.prevent_signal_discontinuity();
 
             self.throttle_dac.output_ab(
                 self.accelerator_position.low(),
@@ -88,8 +87,7 @@ impl ThrottleModule {
 
     pub fn enable_control(&mut self, debug_console: &mut DebugConsole) {
         if !self.control_state.enabled && !self.control_state.operator_override {
-            self.accelerator_position
-                .prevent_signal_discontinuity();
+            self.accelerator_position.prevent_signal_discontinuity();
 
             self.throttle_dac.output_ab(
                 self.accelerator_position.low(),
@@ -102,11 +100,7 @@ impl ThrottleModule {
         }
     }
 
-    pub fn update_throttle(
-        &mut self,
-        spoof_command_high: u16,
-        spoof_command_low: u16
-    ) {
+    pub fn update_throttle(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
             let spoof_high = num::clamp(
                 spoof_command_high,
@@ -125,7 +119,12 @@ impl ThrottleModule {
         }
     }
 
-    pub fn check_for_faults<P: FaultReportPublisher>(&mut self, timer_ms: &MsTimer, debug_console: &mut DebugConsole, fault_report_publisher: &mut P) {
+    pub fn check_for_faults<P: FaultReportPublisher>(
+        &mut self,
+        timer_ms: &MsTimer,
+        debug_console: &mut DebugConsole,
+        fault_report_publisher: &mut P,
+    ) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.read_accelerator_position_sensor();
 
@@ -152,7 +151,9 @@ impl ThrottleModule {
                     .dtcs
                     .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
 
-                if let Err(_) = fault_report_publisher.publish_fault_report(self.supply_fault_report()) {
+                if let Err(_) =
+                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
+                {
                     // TODO - publish error handling
                 }
 
@@ -173,7 +174,9 @@ impl ThrottleModule {
                     .dtcs
                     .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
-                if let Err(_) = fault_report_publisher.publish_fault_report(self.supply_fault_report()) {
+                if let Err(_) =
+                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
+                {
                     // TODO - publish error handling
                 }
 
@@ -221,7 +224,11 @@ impl ThrottleModule {
         }
     }
 
-    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, debug_console: &mut DebugConsole) {
+    fn process_fault_report(
+        &mut self,
+        fault_report: &OsccFaultReport,
+        debug_console: &mut DebugConsole,
+    ) {
         self.disable_control(debug_console);
 
         writeln!(

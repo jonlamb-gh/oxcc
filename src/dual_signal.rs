@@ -1,18 +1,21 @@
-use board::{DAC_SAMPLE_AVERAGE_COUNT};
+use board::DAC_SAMPLE_AVERAGE_COUNT;
 use num;
 
 pub struct DualSignal<T: HighLowReader> {
     high: u16,
     low: u16,
-    reader: T
+    reader: T,
 }
 
-impl <T> DualSignal<T> where T: HighLowReader {
+impl<T> DualSignal<T>
+where
+    T: HighLowReader,
+{
     pub fn new(high: u16, low: u16, high_low_reader: T) -> Self {
         DualSignal {
             high,
             low,
-            reader: high_low_reader
+            reader: high_low_reader,
         }
     }
 
