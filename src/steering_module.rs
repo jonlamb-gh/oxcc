@@ -13,9 +13,8 @@ use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
 use steering_can_protocol::*;
+use types::*;
 use vehicle::*;
-
-// TODO - use some form of println! logging that prefixes with a module name?
 
 const FILTER_ALPHA: f32 = 0.01_f32;
 
@@ -41,59 +40,63 @@ pub struct SteeringModule {
     grounded_fault_state: FaultCondition,
     filtered_diff: u16,
     steering_report: OsccSteeringReport,
-    fault_report_frame: OsccFaultReportFrame,
+    fault_report: OsccFaultReport,
+    steering_dac: SteeringDac,
+    steering_pins: SteeringPins,
 }
 
 impl SteeringModule {
-    pub fn new(torque_sensor: TorqueSensor) -> Self {
+    pub fn new(
+        torque_sensor: TorqueSensor,
+        steering_dac: SteeringDac,
+        steering_pins: SteeringPins,
+    ) -> Self {
         SteeringModule {
             steering_torque: DualSignal::new(0, 0, torque_sensor),
             control_state: SteeringControlState::new(),
             grounded_fault_state: FaultCondition::new(),
             filtered_diff: 0,
             steering_report: OsccSteeringReport::new(),
-            fault_report_frame: OsccFaultReportFrame::new(),
+            fault_report: OsccFaultReport {
+                fault_origin_id: FAULT_ORIGIN_STEERING,
+                dtcs: 0,
+            },
+            steering_dac,
+            steering_pins,
         }
     }
 
-    pub fn init_devices(&self, board: &mut Board) {
-        board.steering_spoof_enable().set_low();
+    pub fn init_devices(&mut self) {
+        self.steering_pins.spoof_enable.set_low();
     }
 
-    pub fn disable_control(&mut self, debug_console: &mut DebugConsole, board: &mut Board) {
+    pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.steering_torque.prevent_signal_discontinuity();
 
-            board
-                .steering_dac()
+            self.steering_dac
                 .output_ab(self.steering_torque.low(), self.steering_torque.high());
 
-            board.steering_spoof_enable().set_low();
+            self.steering_pins.spoof_enable.set_low();
             self.control_state.enabled = false;
             writeln!(debug_console, "Steering control disabled");
         }
     }
 
-    pub fn enable_control(&mut self, debug_console: &mut DebugConsole, board: &mut Board) {
+    pub fn enable_control(&mut self, debug_console: &mut DebugConsole) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.steering_torque.prevent_signal_discontinuity();
 
-            board
-                .steering_dac()
+            self.steering_dac
                 .output_ab(self.steering_torque.low(), self.steering_torque.high());
 
-            board.steering_spoof_enable().set_high();
+            self.steering_pins.spoof_enable.set_high();
             self.control_state.enabled = true;
             writeln!(debug_console, "Steering control enabled");
         }
     }
 
-    pub fn update_steering(
-        &mut self,
-        spoof_command_high: u16,
-        spoof_command_low: u16,
-        board: &mut Board,
-    ) {
+    pub fn update_steering(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
             let spoof_high = num::clamp(
                 spoof_command_high,
@@ -108,15 +111,15 @@ impl SteeringModule {
             );
 
             // TODO - revisit this, enforce high->A, low->B
-            board.steering_dac().output_ab(spoof_high, spoof_low);
+            self.steering_dac.output_ab(spoof_high, spoof_low);
         }
     }
 
-    pub fn check_for_faults(
+    pub fn check_for_faults<P: FaultReportPublisher>(
         &mut self,
         timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
-        board: &mut Board,
+        fault_report_publisher: &mut P,
     ) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.read_torque_sensor();
@@ -143,13 +146,17 @@ impl SteeringModule {
 
             // sensor pins tied to ground - a value of zero indicates disconnection
             if inputs_grounded {
-                self.disable_control(debug_console, board);
+                self.disable_control(debug_console);
 
                 self.control_state
                     .dtcs
                     .set(OSCC_STEERING_DTC_INVALID_SENSOR_VAL);
 
-                self.publish_fault_report(board);
+                if let Err(_) =
+                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
+                {
+                    // TODO - publish error handling
+                }
 
                 writeln!(debug_console, "Bad value read from torque sensor");
             } else if (self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD)
@@ -161,13 +168,17 @@ impl SteeringModule {
                 // but brake and steering do?
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
-                self.disable_control(debug_console, board);
+                self.disable_control(debug_console);
 
                 self.control_state
                     .dtcs
                     .set(OSCC_STEERING_DTC_OPERATOR_OVERRIDE);
 
-                self.publish_fault_report(board);
+                if let Err(_) =
+                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
+                {
+                    // TODO - publish error handling
+                }
 
                 self.control_state.operator_override = true;
 
@@ -191,33 +202,27 @@ impl SteeringModule {
         self.steering_report.transmit(&mut board.control_can());
     }
 
-    pub fn publish_fault_report(&mut self, board: &mut Board) {
-        self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_STEERING;
-        self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
-
-        self.fault_report_frame.transmit(&mut board.control_can());
+    fn supply_fault_report(&mut self) -> &OsccFaultReport {
+        self.fault_report.fault_origin_id = FAULT_ORIGIN_STEERING;
+        self.fault_report.dtcs = self.control_state.dtcs;
+        &self.fault_report
     }
 
     // TODO - error handling
-    pub fn process_rx_frame(
-        &mut self,
-        can_frame: &CanFrame,
-        debug_console: &mut DebugConsole,
-        board: &mut Board,
-    ) {
+    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, debug_console: &mut DebugConsole) {
         if let CanFrame::DataFrame(ref frame) = can_frame {
             let id: u32 = frame.id().into();
             let data = frame.data();
 
             if (data[0] == OSCC_MAGIC_BYTE_0) && (data[1] == OSCC_MAGIC_BYTE_1) {
                 if id == OSCC_STEERING_ENABLE_CAN_ID.into() {
-                    self.enable_control(debug_console, board);
+                    self.enable_control(debug_console);
                 } else if id == OSCC_STEERING_DISABLE_CAN_ID.into() {
-                    self.disable_control(debug_console, board);
+                    self.disable_control(debug_console);
                 } else if id == OSCC_STEERING_COMMAND_CAN_ID.into() {
-                    self.process_steering_command(&OsccSteeringCommand::from(frame), board);
+                    self.process_steering_command(&OsccSteeringCommand::from(frame));
                 } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
-                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console, board);
+                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console);
                 }
             }
         }
@@ -227,9 +232,8 @@ impl SteeringModule {
         &mut self,
         fault_report: &OsccFaultReport,
         debug_console: &mut DebugConsole,
-        board: &mut Board,
     ) {
-        self.disable_control(debug_console, board);
+        self.disable_control(debug_console);
 
         writeln!(
             debug_console,
@@ -238,7 +242,7 @@ impl SteeringModule {
         );
     }
 
-    fn process_steering_command(&mut self, command: &OsccSteeringCommand, board: &mut Board) {
+    fn process_steering_command(&mut self, command: &OsccSteeringCommand) {
         let clamped_torque = num::clamp(
             command.torque_request * MAXIMUM_TORQUE_COMMAND,
             MINIMUM_TORQUE_COMMAND,
@@ -260,7 +264,7 @@ impl SteeringModule {
         let spoof_value_low = (STEPS_PER_VOLT * spoof_voltage_low) as u16;
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
-        self.update_steering(spoof_value_high, spoof_value_low, board);
+        self.update_steering(spoof_value_high, spoof_value_low);
     }
 
     fn read_torque_sensor(&mut self) {

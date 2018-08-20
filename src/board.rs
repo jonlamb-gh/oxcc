@@ -66,8 +66,6 @@ pub struct Board {
     pub reset_conditions: ResetConditions,
     control_can: ControlCan,
     obd_can: ObdCan,
-    steering_dac: SteeringDac,
-    steering_pins: SteeringPins,
     fault_report_can_frame: DataFrame,
 }
 
@@ -319,6 +317,8 @@ impl FullBoard {
         ThrottleDac,
         ThrottlePins,
         TorqueSensor,
+        SteeringDac,
+        SteeringPins,
         MsTimer,
         DebugConsole,
     ) {
@@ -353,8 +353,6 @@ impl FullBoard {
                 reset_conditions,
                 control_can,
                 obd_can,
-                steering_dac,
-                steering_pins,
                 fault_report_can_frame: default_fault_report_data_frame(),
             },
             brake_dac,
@@ -364,6 +362,8 @@ impl FullBoard {
             throttle_dac,
             throttle_pins,
             torque_sensor,
+            steering_dac,
+            steering_pins,
             timer_ms,
             debug_console,
         )
@@ -375,20 +375,12 @@ impl Board {
         self.user_button.is_high()
     }
 
-    pub fn steering_spoof_enable(&mut self) -> &mut SteeringSpoofEnablePin {
-        &mut self.steering_pins.spoof_enable
-    }
-
     pub fn control_can(&mut self) -> &mut ControlCan {
         &mut self.control_can
     }
 
     pub fn obd_can(&mut self) -> &mut ObdCan {
         &mut self.obd_can
-    }
-
-    pub fn steering_dac(&mut self) -> &mut SteeringDac {
-        &mut self.steering_dac
     }
 }
 
