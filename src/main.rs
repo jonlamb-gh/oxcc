@@ -68,6 +68,8 @@ use rt::ExceptionFrame;
 use steering_module::SteeringModule;
 use throttle_module::ThrottleModule;
 
+const DEBUG_WRITE_FAILURE: &str = "Failed to write to debug_console";
+
 entry!(main);
 
 fn main() -> ! {
@@ -97,22 +99,23 @@ fn main() -> ! {
         writeln!(debug_console, "oxcc is running").unwrap();
 
         if board.reset_conditions.low_power {
-            writeln!(debug_console, "WARNING: low-power reset detected").unwrap();
+            writeln!(debug_console, "WARNING: low-power reset detected")
+                .expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.window_watchdog || board.reset_conditions.independent_watchdog {
-            writeln!(debug_console, "WARNING: watchdog reset detected").unwrap();
+            writeln!(debug_console, "WARNING: watchdog reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.software {
-            writeln!(debug_console, "WARNING: software reset detected").unwrap();
+            writeln!(debug_console, "WARNING: software reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.por_pdr {
-            writeln!(debug_console, "WARNING: POR/PDR reset detected").unwrap();
+            writeln!(debug_console, "WARNING: POR/PDR reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.pin {
-            writeln!(debug_console, "WARNING: PIN reset detected").unwrap();
+            writeln!(debug_console, "WARNING: PIN reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.bor {
-            writeln!(debug_console, "WARNING: BOR reset detected").unwrap();
+            writeln!(debug_console, "WARNING: BOR reset detected").expect(DEBUG_WRITE_FAILURE);
         }
     }
 
