@@ -1,7 +1,7 @@
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.cpp
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.h#L19
 
-use board::Board;
+use ms_timer::MsTimer;
 use dual_signal::{DualSignal, HighLowReader};
 
 pub struct FaultCondition {
@@ -21,7 +21,7 @@ impl FaultCondition {
         &mut self,
         condition_active: bool,
         max_duration: u32,
-        board: &mut Board,
+        timer_ms: &MsTimer,
     ) -> bool {
         let mut faulted = false;
 
@@ -33,7 +33,7 @@ impl FaultCondition {
             self.monitoring_active = false;
             self.condition_start_time = 0;
         } else {
-            let now = board.timer_ms.ms();
+            let now = timer_ms.ms();
 
             if !self.monitoring_active {
                 /* We just detected a condition that may lead to a fault. Update
@@ -61,10 +61,10 @@ impl FaultCondition {
         &mut self,
         signal: &DualSignal<T>,
         max_duration: u32,
-        board: &mut Board,
+        timer_ms: &MsTimer,
     ) -> bool {
         let condition_active = (signal.high() == 0) || (signal.low() == 0);
 
-        self.condition_exceeded_duration(condition_active, max_duration, board)
+        self.condition_exceeded_duration(condition_active, max_duration, timer_ms)
     }
 }

@@ -8,6 +8,8 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
+use ms_timer::MsTimer;
+use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
@@ -78,7 +80,7 @@ impl BrakeModule {
         &mut self.brake_dac
     }
 
-    pub fn disable_control(&mut self, board: &mut Board) {
+    pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.brake_pedal_position
                 .prevent_signal_discontinuity();
@@ -90,11 +92,11 @@ impl BrakeModule {
             self.brake_spoof_enable().set_low();
             self.brake_light_enable().set_low();
             self.control_state.enabled = false;
-            writeln!(board.debug_console, "Brake control disabled");
+            writeln!(debug_console, "Brake control disabled");
         }
     }
 
-    pub fn enable_control(&mut self, board: &mut Board) {
+    pub fn enable_control(&mut self, debug_console: &mut DebugConsole) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.brake_pedal_position
                 .prevent_signal_discontinuity();
@@ -105,7 +107,7 @@ impl BrakeModule {
 
             self.brake_spoof_enable().set_high();
             self.control_state.enabled = true;
-            writeln!(board.debug_console, "Brake control enabled");
+            writeln!(debug_console, "Brake control enabled");
         }
     }
 
@@ -136,7 +138,7 @@ impl BrakeModule {
         }
     }
 
-    pub fn check_for_faults(&mut self, board: &mut Board) {
+    pub fn check_for_faults(&mut self, timer_ms: &MsTimer, debug_console: &mut DebugConsole, board: &mut Board) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.brake_pedal_position.update();
 
@@ -146,18 +148,18 @@ impl BrakeModule {
                 self.operator_override_state.condition_exceeded_duration(
                     brake_pedal_position_average >= BRAKE_PEDAL_OVERRIDE_THRESHOLD.into(),
                     FAULT_HYSTERESIS,
-                    board,
+                    timer_ms,
                 );
 
             let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
                 &self.brake_pedal_position,
                 FAULT_HYSTERESIS,
-                board,
+                timer_ms,
             );
 
             // sensor pins tied to ground - a value of zero indicates disconnection
             if inputs_grounded {
-                self.disable_control(board);
+                self.disable_control(debug_console);
 
                 self.control_state
                     .dtcs
@@ -166,7 +168,7 @@ impl BrakeModule {
                 self.publish_fault_report(board);
 
                 writeln!(
-                    board.debug_console,
+                    debug_console,
                     "Bad value read from brake pedal position sensor"
                 );
             } else if operator_overridden && !self.control_state.operator_override {
@@ -176,7 +178,7 @@ impl BrakeModule {
                 // but brake and steering do?
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
-                self.disable_control(board);
+                self.disable_control(debug_console);
 
                 self.control_state
                     .dtcs
@@ -186,7 +188,7 @@ impl BrakeModule {
 
                 self.control_state.operator_override = true;
 
-                writeln!(board.debug_console, "Brake operator override");
+                writeln!(debug_console, "Brake operator override");
             } else {
                 self.control_state.dtcs = 0;
                 self.control_state.operator_override = false;
@@ -210,30 +212,30 @@ impl BrakeModule {
     }
 
     // TODO - error handling
-    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, board: &mut Board) {
+    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, debug_console: &mut DebugConsole) {
         if let CanFrame::DataFrame(ref frame) = can_frame {
             let id: u32 = frame.id().into();
             let data = frame.data();
 
             if (data[0] == OSCC_MAGIC_BYTE_0) && (data[1] == OSCC_MAGIC_BYTE_1) {
                 if id == OSCC_BRAKE_ENABLE_CAN_ID.into() {
-                    self.enable_control(board);
+                    self.enable_control(debug_console);
                 } else if id == OSCC_BRAKE_DISABLE_CAN_ID.into() {
-                    self.disable_control(board);
+                    self.disable_control(debug_console);
                 } else if id == OSCC_BRAKE_COMMAND_CAN_ID.into() {
                     self.process_brake_command(&OsccBrakeCommand::from(frame));
                 } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
-                    self.process_fault_report(&OsccFaultReport::from(frame), board);
+                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console);
                 }
             }
         }
     }
 
-    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, board: &mut Board) {
-        self.disable_control(board);
+    fn process_fault_report(&mut self, fault_report: &OsccFaultReport, debug_console: &mut DebugConsole) {
+        self.disable_control(debug_console);
 
         writeln!(
-            board.debug_console,
+            debug_console,
             "Fault report received from: {} DTCs: {}",
             fault_report.fault_origin_id, fault_report.dtcs
         );

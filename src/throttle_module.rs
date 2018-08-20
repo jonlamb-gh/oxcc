@@ -6,6 +6,7 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
+use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
@@ -39,7 +40,7 @@ pub struct ThrottleModule {
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
     throttle_report: OsccThrottleReport,
-    fault_report_frame: OsccFaultReportFrame,
+    fault_report: OsccFaultReport,
     throttle_dac: ThrottleDac,
     throttle_pins: ThrottlePins,
 }
@@ -56,7 +57,10 @@ impl ThrottleModule {
             grounded_fault_state: FaultCondition::new(),
             operator_override_state: FaultCondition::new(),
             throttle_report: OsccThrottleReport::new(),
-            fault_report_frame: OsccFaultReportFrame::new(),
+            fault_report: OsccFaultReport {
+                fault_origin_id: FAULT_ORIGIN_THROTTLE,
+                dtcs: 0
+            },
             throttle_dac,
             throttle_pins
         }
@@ -121,7 +125,7 @@ impl ThrottleModule {
         }
     }
 
-    pub fn check_for_faults(&mut self, board: &mut Board) {
+    pub fn check_for_faults<P: FaultReportPublisher>(&mut self, timer_ms: &MsTimer, debug_console: &mut DebugConsole, fault_report_publisher: &mut P) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.read_accelerator_position_sensor();
 
@@ -131,27 +135,29 @@ impl ThrottleModule {
                 self.operator_override_state.condition_exceeded_duration(
                     accelerator_position_average >= ACCELERATOR_OVERRIDE_THRESHOLD,
                     FAULT_HYSTERESIS,
-                    board,
+                    timer_ms,
                 );
 
             let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
                 &self.accelerator_position,
                 FAULT_HYSTERESIS,
-                board,
+                timer_ms,
             );
 
             // sensor pins tied to ground - a value of zero indicates disconnection
             if inputs_grounded {
-                self.disable_control(&mut board.debug_console);
+                self.disable_control(debug_console);
 
                 self.control_state
                     .dtcs
                     .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
 
-                self.publish_fault_report(board);
+                if let Err(_) = fault_report_publisher.publish_fault_report(self.supply_fault_report()) {
+                    // TODO - publish error handling
+                }
 
                 writeln!(
-                    board.debug_console,
+                    debug_console,
                     "Bad value read from accelerator position sensor"
                 );
             } else if operator_overridden && !self.control_state.operator_override {
@@ -161,17 +167,19 @@ impl ThrottleModule {
                 // but brake and steering do?
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
                 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
-                self.disable_control(&mut board.debug_console);
+                self.disable_control(debug_console);
 
                 self.control_state
                     .dtcs
                     .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
-                self.publish_fault_report(board);
+                if let Err(_) = fault_report_publisher.publish_fault_report(self.supply_fault_report()) {
+                    // TODO - publish error handling
+                }
 
                 self.control_state.operator_override = true;
 
-                writeln!(board.debug_console, "Throttle operator override");
+                writeln!(debug_console, "Throttle operator override");
             } else {
                 self.control_state.dtcs = 0;
                 self.control_state.operator_override = false;
@@ -187,11 +195,10 @@ impl ThrottleModule {
         self.throttle_report.transmit(&mut board.control_can());
     }
 
-    pub fn publish_fault_report(&mut self, board: &mut Board) {
-        self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_THROTTLE;
-        self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
-
-        self.fault_report_frame.transmit(&mut board.control_can());
+    fn supply_fault_report(&mut self) -> &OsccFaultReport {
+        self.fault_report.fault_origin_id = FAULT_ORIGIN_THROTTLE;
+        self.fault_report.dtcs = self.control_state.dtcs;
+        &self.fault_report
     }
 
     // TODO - error handling

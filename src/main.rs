@@ -73,7 +73,8 @@ fn main() -> ! {
     // once the organization is cleaned up, the entire board doesn't need to be
     // mutable let Board {mut leds, mut delay, ..} = Board::new();
     let (mut board, brake_dac, brake_pins, brake_pedal_position_sensor,
-        accelerator_position_sensor, throttle_dac, throttle_pins, torque_sensor) = FullBoard::new().split_components();
+        accelerator_position_sensor, throttle_dac, throttle_pins, torque_sensor,
+        timer_ms, mut debug_console) = FullBoard::new().split_components();
 
     // turn on the blue LED
     board.leds[led::Color::Blue].on();
@@ -81,25 +82,25 @@ fn main() -> ! {
     // show startup message and reset warnings if debugging
     #[cfg(debug_assertions)]
     {
-        writeln!(board.debug_console, "oxcc is running").unwrap();
+        writeln!(debug_console, "oxcc is running").unwrap();
 
         if board.reset_conditions.low_power {
-            writeln!(board.debug_console, "WARNING: low-power reset detected").unwrap();
+            writeln!(debug_console, "WARNING: low-power reset detected").unwrap();
         }
         if board.reset_conditions.window_watchdog || board.reset_conditions.independent_watchdog {
-            writeln!(board.debug_console, "WARNING: watchdog reset detected").unwrap();
+            writeln!(debug_console, "WARNING: watchdog reset detected").unwrap();
         }
         if board.reset_conditions.software {
-            writeln!(board.debug_console, "WARNING: software reset detected").unwrap();
+            writeln!(debug_console, "WARNING: software reset detected").unwrap();
         }
         if board.reset_conditions.por_pdr {
-            writeln!(board.debug_console, "WARNING: POR/PDR reset detected").unwrap();
+            writeln!(debug_console, "WARNING: POR/PDR reset detected").unwrap();
         }
         if board.reset_conditions.pin {
-            writeln!(board.debug_console, "WARNING: PIN reset detected").unwrap();
+            writeln!(debug_console, "WARNING: PIN reset detected").unwrap();
         }
         if board.reset_conditions.bor {
-            writeln!(board.debug_console, "WARNING: BOR reset detected").unwrap();
+            writeln!(debug_console, "WARNING: BOR reset detected").unwrap();
         }
     }
 
@@ -125,15 +126,15 @@ fn main() -> ! {
         // poll both control CAN FIFOs
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
             if let Ok(rx_frame) = board.control_can().receive(fifo) {
-                brake.process_rx_frame(&rx_frame, &mut board);
-                throttle.process_rx_frame(&rx_frame, &mut board.debug_console);
-                steering.process_rx_frame(&rx_frame, &mut board);
+                brake.process_rx_frame(&rx_frame, &mut debug_console);
+                throttle.process_rx_frame(&rx_frame, &mut debug_console);
+                steering.process_rx_frame(&rx_frame, &mut debug_console, &mut board);
             }
         }
 
-        brake.check_for_faults(&mut board);
-        throttle.check_for_faults(&mut board);
-        steering.check_for_faults(&mut board);
+        brake.check_for_faults(&timer_ms, &mut debug_console, &mut board);
+        throttle.check_for_faults(&timer_ms, &mut debug_console, &mut board);
+        steering.check_for_faults(&timer_ms, &mut debug_console, &mut board);
 
         // poll both OBD CAN FIFOs
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {

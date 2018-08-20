@@ -3,10 +3,11 @@ use cortex_m;
 use dac_mcp4922::Mcp4922;
 use dac_mcp4922::MODE as DAC_MODE;
 use dual_signal::HighLowReader;
+use fault_can_protocol::*;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
-use nucleo_f767zi::hal::can::Can;
+use nucleo_f767zi::hal::can::{Can, CanError, DataFrame};
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::iwdg::{Iwdg, IwdgConfig, WatchdogTimeout};
 use nucleo_f767zi::hal::prelude::*;
@@ -17,6 +18,7 @@ use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
+use oscc_magic_byte::*;
 
 pub use types::*;
 
@@ -56,11 +58,9 @@ pub struct FullBoard {
 }
 
 pub struct Board {
-    pub debug_console: DebugConsole,
     pub leds: Leds,
     pub user_button: UserButtonPin,
     pub delay: Delay,
-    pub timer_ms: MsTimer,
     pub can_publish_timer: CanPublishTimer,
     pub wdg: Iwdg<IWDG>,
     pub reset_conditions: ResetConditions,
@@ -68,6 +68,7 @@ pub struct Board {
     obd_can: ObdCan,
     steering_dac: SteeringDac,
     steering_pins: SteeringPins,
+    fault_report_can_frame: DataFrame,
 }
 
 impl FullBoard {
@@ -307,7 +308,9 @@ impl FullBoard {
         }
     }
 
-    pub fn split_components(self) -> (Board, BrakeDac, BrakePins, BrakePedalPositionSensor, AcceleratorPositionSensor, ThrottleDac, ThrottlePins, TorqueSensor) {
+    pub fn split_components(self) -> (Board, BrakeDac, BrakePins, BrakePedalPositionSensor,
+                                      AcceleratorPositionSensor, ThrottleDac, ThrottlePins,
+                                      TorqueSensor, MsTimer, DebugConsole) {
         let FullBoard {
             debug_console,
             leds,
@@ -331,11 +334,9 @@ impl FullBoard {
         } = self;
         (
             Board {
-                debug_console,
                 leds,
                 user_button,
                 delay,
-                timer_ms,
                 can_publish_timer,
                 wdg,
                 reset_conditions,
@@ -343,6 +344,7 @@ impl FullBoard {
                 obd_can,
                 steering_dac,
                 steering_pins,
+                fault_report_can_frame: default_fault_report_data_frame(),
             },
             brake_dac,
             brake_pins,
@@ -350,7 +352,9 @@ impl FullBoard {
             accelerator_position_sensor,
             throttle_dac,
             throttle_pins,
-            torque_sensor
+            torque_sensor,
+            timer_ms,
+            debug_console
         )
     }
 }
@@ -416,6 +420,27 @@ impl HighLowReader for TorqueSensor {
     }
     fn read_low(&self) -> u16 {
         self.adc3.read(AdcChannel::Adc3In8, ADC_SAMPLE_TIME)
+    }
+}
+
+impl FaultReportPublisher for Board {
+    fn publish_fault_report(&mut self, fault_report: &OsccFaultReport) -> Result<(), CanError> {
+        {
+            self.fault_report_can_frame
+                .set_data_length(OSCC_FAULT_REPORT_CAN_DLC as _);
+
+            let data = self.fault_report_can_frame.data_as_mut();
+
+            data[0] = OSCC_MAGIC_BYTE_0;
+            data[1] = OSCC_MAGIC_BYTE_1;
+            data[2] = (fault_report.fault_origin_id & 0xFF) as _;
+            data[3] = ((fault_report.fault_origin_id >> 8) & 0xFF) as _;
+            data[4] = ((fault_report.fault_origin_id >> 16) & 0xFF) as _;
+            data[5] = ((fault_report.fault_origin_id >> 24) & 0xFF) as _;
+            data[6] = fault_report.dtcs;
+        }
+
+        self.control_can.transmit(&self.fault_report_can_frame.into())
     }
 }
 
