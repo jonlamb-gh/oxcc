@@ -58,10 +58,10 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     f0.mode = FilterMode::IdList;
     f0.fifo_assignment = RxFifo::Fifo0;
     f0.scale = FilterScale::Fs16Bit;
-    f0.filter_mask_id_low = (OSCC_THROTTLE_DISABLE_CAN_ID << 5) as _;
-    f0.filter_id_low = (OSCC_BRAKE_DISABLE_CAN_ID << 5) as _;
-    f0.filter_mask_id_high = (OSCC_STEERING_DISABLE_CAN_ID << 5) as _;
-    f0.filter_id_high = (OSCC_FAULT_REPORT_CAN_ID << 5) as _;
+    f0.filter_mask_id_low = u32::from(OSCC_THROTTLE_DISABLE_CAN_ID << 5);
+    f0.filter_id_low = u32::from(OSCC_BRAKE_DISABLE_CAN_ID << 5);
+    f0.filter_mask_id_high = u32::from(OSCC_STEERING_DISABLE_CAN_ID << 5);
+    f0.filter_id_high = u32::from(OSCC_FAULT_REPORT_CAN_ID << 5);
 
     // filter 1 stores the control command IDs for brake, throttle, and steering
     // FIFO_1
@@ -71,9 +71,9 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     f1.mode = FilterMode::IdList;
     f1.fifo_assignment = RxFifo::Fifo1;
     f1.scale = FilterScale::Fs16Bit;
-    f1.filter_mask_id_low = (OSCC_BRAKE_COMMAND_CAN_ID << 5) as _;
-    f1.filter_id_low = (OSCC_THROTTLE_COMMAND_CAN_ID << 5) as _;
-    f1.filter_mask_id_high = (OSCC_STEERING_COMMAND_CAN_ID << 5) as _;
+    f1.filter_mask_id_low = u32::from(OSCC_BRAKE_COMMAND_CAN_ID << 5);
+    f1.filter_id_low = u32::from(OSCC_THROTTLE_COMMAND_CAN_ID << 5);
+    f1.filter_mask_id_high = u32::from(OSCC_STEERING_COMMAND_CAN_ID << 5);
     f1.filter_id_high = 0;
 
     // filter 2 stores the enable control IDs for brake, throttle, and steering
@@ -84,9 +84,9 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     f2.mode = FilterMode::IdList;
     f2.fifo_assignment = RxFifo::Fifo1;
     f2.scale = FilterScale::Fs16Bit;
-    f2.filter_mask_id_low = (OSCC_BRAKE_ENABLE_CAN_ID << 5) as _;
-    f2.filter_id_low = (OSCC_THROTTLE_ENABLE_CAN_ID << 5) as _;
-    f2.filter_mask_id_high = (OSCC_STEERING_ENABLE_CAN_ID << 5) as _;
+    f2.filter_mask_id_low = u32::from(OSCC_BRAKE_ENABLE_CAN_ID << 5);
+    f2.filter_id_low = u32::from(OSCC_THROTTLE_ENABLE_CAN_ID << 5);
+    f2.filter_mask_id_high = u32::from(OSCC_STEERING_ENABLE_CAN_ID << 5);
     f2.filter_id_high = 0;
 
     [f0, f1, f2]
@@ -103,12 +103,12 @@ pub fn gather_obd_can_filters() -> [CanFilterConfig; 1] {
     f3.mode = FilterMode::IdList;
     f3.fifo_assignment = RxFifo::Fifo0;
     f3.scale = FilterScale::Fs16Bit;
-    f3.filter_mask_id_low = (KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID << 5) as _;
-    f3.filter_id_low = (KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID << 5) as _;
-    f3.filter_mask_id_high = (KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID << 5) as _;
+    f3.filter_mask_id_low = u32::from(KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID << 5);
+    f3.filter_id_low = u32::from(KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID << 5);
+    f3.filter_mask_id_high = u32::from(KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID << 5);
     #[cfg(feature = "kia-soul-ev")]
     {
-        f3.filter_id_high = (KIA_SOUL_OBD_THROTTLE_PRESSURE_CAN_ID << 5) as _;
+        f3.filter_id_high = u32::from(KIA_SOUL_OBD_THROTTLE_PRESSURE_CAN_ID << 5);
     }
 
     [f3]

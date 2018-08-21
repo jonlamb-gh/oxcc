@@ -191,7 +191,7 @@ impl FullBoard {
         unsafe {
             // TODO - move this constant into BSP crate?
             // unlock registers to enable DWT cycle counter for MsTimer
-            core_peripherals.DWT.lar.write(0xC5ACCE55);
+            core_peripherals.DWT.lar.write(0xC5AC_CE55);
         }
 
         let mut leds = Leds::new(led_r, led_g, led_b);
@@ -229,14 +229,14 @@ impl FullBoard {
         ).expect("Failed to configure OBD CAN (CAN2)");
 
         // apply control CAN filters
-        for filter in config::gather_control_can_filters().iter() {
+        for filter in &config::gather_control_can_filters() {
             control_can
                 .configure_filter(&filter)
                 .expect("Failed to configure control CAN filter");
         }
 
         // apply OBD CAN filters
-        for filter in config::gather_obd_can_filters().iter() {
+        for filter in &config::gather_obd_can_filters() {
             obd_can
                 .configure_filter(&filter)
                 .expect("Failed to configure OBD CAN filter");

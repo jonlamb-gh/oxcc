@@ -48,8 +48,7 @@ where
         let mut buffer = [0u8; 2];
         // bits 11 through 0: data
         buffer[0] = (data & 0x00FF) as _;
-        buffer[1] = 0x00
-            | ((data >> 8) & 0x000F) as u8
+        buffer[1] = ((data >> 8) & 0x000F) as u8
             // bit 12: shutdown bit. 1 for active operation
             | (1 << 4)
             // bit 13: gain bit; 0 for 1x gain, 1 for 2x
@@ -57,7 +56,7 @@ where
             // bit 15: 0 for DAC A, 1 for DAC B
             | u8::from(channel) << 7;
 
-        if let Err(_) = self.spi.transfer(&mut buffer) {
+        if self.spi.transfer(&mut buffer).is_err() {
             // TODO - error handling
         }
 

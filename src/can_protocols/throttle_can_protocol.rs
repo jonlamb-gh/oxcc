@@ -19,13 +19,13 @@ pub struct OsccThrottleCommand {
 
 impl<'a> From<&'a DataFrame> for OsccThrottleCommand {
     fn from(f: &DataFrame) -> Self {
-        assert_eq!(u32::from(f.id()), OSCC_THROTTLE_COMMAND_CAN_ID as u32);
+        assert_eq!(u32::from(f.id()), u32::from(OSCC_THROTTLE_COMMAND_CAN_ID));
         let data = f.data();
 
-        let raw_torque_request: u32 = data[2] as u32
-            | ((data[3] as u32) << 8)
-            | ((data[4] as u32) << 16)
-            | ((data[5] as u32) << 24);
+        let raw_torque_request: u32 = u32::from(data[2])
+            | (u32::from(data[3]) << 8)
+            | (u32::from(data[4]) << 16)
+            | (u32::from(data[5]) << 24);
 
         OsccThrottleCommand {
             torque_request: raw_torque_request as f32,
@@ -54,7 +54,7 @@ impl OsccThrottleReport {
     pub fn transmit(&mut self, can: &mut ControlCan) {
         self.update_can_frame();
 
-        if let Err(_) = can.transmit(&self.can_frame.into()) {
+        if can.transmit(&self.can_frame.into()).is_err() {
             // TODO
         }
     }

@@ -32,7 +32,7 @@ where
         ThrottleControlState {
             enabled: false,
             operator_override: false,
-            dtcs: dtcs,
+            dtcs,
         }
     }
 }

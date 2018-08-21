@@ -134,8 +134,8 @@ impl SteeringModule {
             // OSCC goes back and forth with u16 and f32 types
             self.filtered_diff = self.exponential_moving_average(
                 FILTER_ALPHA,
-                unfiltered_diff as _,
-                self.filtered_diff as _,
+                f32::from(unfiltered_diff),
+                f32::from(self.filtered_diff),
             ) as _;
 
             let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
@@ -152,8 +152,9 @@ impl SteeringModule {
                     .dtcs
                     .set(OSCC_STEERING_DTC_INVALID_SENSOR_VAL);
 
-                if let Err(_) =
-                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
+                if fault_report_publisher
+                    .publish_fault_report(self.supply_fault_report())
+                    .is_err()
                 {
                     // TODO - publish error handling
                 }
@@ -174,8 +175,9 @@ impl SteeringModule {
                     .dtcs
                     .set(OSCC_STEERING_DTC_OPERATOR_OVERRIDE);
 
-                if let Err(_) =
-                    fault_report_publisher.publish_fault_report(self.supply_fault_report())
+                if fault_report_publisher
+                    .publish_fault_report(self.supply_fault_report())
+                    .is_err()
                 {
                     // TODO - publish error handling
                 }

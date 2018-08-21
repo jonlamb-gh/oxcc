@@ -32,11 +32,11 @@ where
         let mut high: u32 = 0;
 
         for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            low += self.reader.read_low() as u32;
+            low += u32::from(self.reader.read_low());
         }
 
         for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            high += self.reader.read_high() as u32;
+            high += u32::from(self.reader.read_high());
         }
 
         self.low = (low / DAC_SAMPLE_AVERAGE_COUNT) as _;
@@ -44,11 +44,11 @@ where
     }
 
     pub fn average(&self) -> u32 {
-        (self.low as u32 + self.high as u32) / 2
+        (u32::from(self.low) + u32::from(self.high)) / 2
     }
 
     pub fn diff(&self) -> u16 {
-        num::abs((self.high as i32) - (self.low as i32)) as u16
+        num::abs(i32::from(self.high) - i32::from(self.low)) as u16
     }
 
     pub fn high(&self) -> u16 {
