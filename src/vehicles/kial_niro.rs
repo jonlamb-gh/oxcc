@@ -159,7 +159,7 @@ pub const fn brake_position_to_volts_high(position: f32) -> f32 {
  * override. [steps] */
 //
 //
-pub const BRAKE_PEDAL_OVERRIDE_THRESHOLD: u16 = 200;
+pub const BRAKE_PEDAL_OVERRIDE_THRESHOLD: u16 = 200 << 2;
 
 /*
  * @brief Minimum value of the high spoof signal that activates the brake
@@ -387,4 +387,4 @@ pub const fn throttle_position_to_volts_high(position: f32) -> f32 {
  * override. [steps] */
 //
 //
-pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185;
+pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185 << 2;
