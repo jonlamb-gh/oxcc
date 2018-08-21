@@ -1,8 +1,9 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/brake/kia_soul_ev_niro
 
 use super::types::*;
-use board::{Board, BrakePedalPositionSensor};
+use board::BrakePedalPositionSensor;
 use brake_can_protocol::*;
+use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
@@ -76,11 +77,11 @@ impl BrakeModule {
         &mut self.brake_pins.brake_light_enable
     }
 
-    pub fn brake_dac(&mut self) -> &mut BrakeDac {
+    fn brake_dac(&mut self) -> &mut BrakeDac {
         &mut self.brake_dac
     }
 
-    pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
+    fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
@@ -95,7 +96,7 @@ impl BrakeModule {
         }
     }
 
-    pub fn enable_control(&mut self, debug_console: &mut DebugConsole) {
+    fn enable_control(&mut self, debug_console: &mut DebugConsole) {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
@@ -109,7 +110,7 @@ impl BrakeModule {
         }
     }
 
-    pub fn update_brake(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
+    fn update_brake(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
             let spoof_high = num::clamp(
                 spoof_command_high,
@@ -140,7 +141,7 @@ impl BrakeModule {
         &mut self,
         timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
-        board: &mut Board,
+        can_gateway: &mut CanGatewayModule,
     ) {
         if self.control_state.enabled || self.control_state.dtcs > 0 {
             self.brake_pedal_position.update();
@@ -168,7 +169,7 @@ impl BrakeModule {
                     .dtcs
                     .set(OSCC_BRAKE_DTC_INVALID_SENSOR_VAL);
 
-                self.publish_fault_report(board);
+                self.publish_fault_report(can_gateway);
 
                 writeln!(
                     debug_console,
@@ -187,7 +188,7 @@ impl BrakeModule {
                     .dtcs
                     .set(OSCC_BRAKE_DTC_OPERATOR_OVERRIDE);
 
-                self.publish_fault_report(board);
+                self.publish_fault_report(can_gateway);
 
                 self.control_state.operator_override = true;
 
@@ -199,19 +200,20 @@ impl BrakeModule {
         }
     }
 
-    pub fn publish_brake_report(&mut self, board: &mut Board) {
+    pub fn publish_brake_report(&mut self, can_gateway: &mut CanGatewayModule) {
         self.brake_report.enabled = self.control_state.enabled;
         self.brake_report.operator_override = self.control_state.operator_override;
         self.brake_report.dtcs = self.control_state.dtcs;
 
-        self.brake_report.transmit(&mut board.control_can());
+        self.brake_report.transmit(&mut can_gateway.control_can());
     }
 
-    pub fn publish_fault_report(&mut self, board: &mut Board) {
+    pub fn publish_fault_report(&mut self, can_gateway: &mut CanGatewayModule) {
         self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_BRAKE;
         self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
 
-        self.fault_report_frame.transmit(&mut board.control_can());
+        self.fault_report_frame
+            .transmit(&mut can_gateway.control_can());
     }
 
     // TODO - error handling
