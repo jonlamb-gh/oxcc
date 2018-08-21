@@ -6,7 +6,7 @@ use dual_signal::HighLowReader;
 use fault_can_protocol::*;
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
-use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcSampleTime};
+use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcPrescaler, AdcSampleTime};
 use nucleo_f767zi::hal::can::{Can, CanError, DataFrame};
 use nucleo_f767zi::hal::delay::Delay;
 use nucleo_f767zi::hal::iwdg::{Iwdg, IwdgConfig, WatchdogTimeout};
@@ -22,13 +22,27 @@ use oscc_magic_byte::*;
 
 pub use types::*;
 
-// feature to pick how to route up debug_println/println?
-// or
-// - println! -> Serial3 console (currently debug_console)
-// - debug_println! -> ITM/semihosting link
-
 pub const CAN_PUBLISH_HZ: u32 = 50;
 
+// TODO
+// We need to decide on a desired ADC sample time.
+//
+// The OSCC Arduino modules were likely using the
+// default configuration which is about 104 microseconds
+// per `analogRead()`.
+//
+// total conversion time = sampling time + 12 cycles
+// ADC clock = APB2 clock / prescaler
+// e.g our current config, 216 MHz, APB2 108 MHz
+//   ADCCLK = 108 / Prescaler4 = 27 MHz
+//   time = Cycles480 + 12 = 492 cycles == 18.22 us
+//
+//   ADCCLK = 108 / Prescaler6 = 18 MHz
+//   time = Cycles480 + 12 = 492 cycles == 27.33 us
+//
+// NOTE: prescaler must be chosen such that the ADC clock
+// does not exceed 30 MHz
+pub const ADC_PRESCALER: AdcPrescaler = AdcPrescaler::Prescaler4;
 pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
 
 // not sure if the averaging is needed, we might be able to just use a
@@ -291,13 +305,13 @@ impl FullBoard {
             control_can,
             obd_can,
             brake_pedal_position_sensor: BrakePedalPositionSensor {
-                adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2),
+                adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2, ADC_PRESCALER),
             },
             accelerator_position_sensor: AcceleratorPositionSensor {
-                adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2),
+                adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2, ADC_PRESCALER),
             },
             torque_sensor: TorqueSensor {
-                adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2),
+                adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2, ADC_PRESCALER),
             },
             brake_dac: Mcp4922::new(brake_spi, brake_nss),
             throttle_dac: Mcp4922::new(throttle_spi, throttle_nss),
