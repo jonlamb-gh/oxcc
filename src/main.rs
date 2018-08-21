@@ -62,11 +62,10 @@ use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use fault_can_protocol::FaultReportPublisher;
 use nucleo_f767zi::hal::can::RxFifo;
-use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
 use steering_module::SteeringModule;
-use throttle_module::ThrottleModule;
+use throttle_module::UnpreparedThrottleModule;
 
 const DEBUG_WRITE_FAILURE: &str = "Failed to write to debug_console";
 
@@ -88,6 +87,9 @@ fn main() -> ! {
         steering_pins,
         timer_ms,
         mut debug_console,
+        can_publish_timer,
+        control_can,
+        obd_can,
     ) = FullBoard::new().split_components();
 
     // turn on the blue LED
@@ -120,20 +122,19 @@ fn main() -> ! {
     }
 
     let mut brake = BrakeModule::new(brake_dac, brake_pins, brake_pedal_position_sensor);
-    let mut throttle =
-        ThrottleModule::new(accelerator_position_sensor, throttle_dac, throttle_pins);
+    let unprepared_throttle_module =
+        UnpreparedThrottleModule::new(accelerator_position_sensor, throttle_dac, throttle_pins);
     let mut steering = SteeringModule::new(torque_sensor, steering_dac, steering_pins);
-    let mut can_gateway = CanGatewayModule::new();
+    let mut can_gateway = CanGatewayModule::new(can_publish_timer, control_can, obd_can);
 
     brake.init_devices();
-    throttle.init_devices();
+    let mut throttle = unprepared_throttle_module.prepare_module();
     steering.init_devices();
-    can_gateway.init_devices(&mut board);
 
     // send reports immediately
-    brake.publish_brake_report(&mut board);
-    throttle.publish_throttle_report(&mut board);
-    steering.publish_steering_report(&mut board);
+    brake.publish_brake_report(&mut can_gateway);
+    throttle.publish_throttle_report(&mut can_gateway);
+    steering.publish_steering_report(&mut can_gateway);
 
     loop {
         // refresh the independent watchdog
@@ -141,7 +142,7 @@ fn main() -> ! {
 
         // poll both control CAN FIFOs
         for fifo in &[RxFifo::Fifo0, RxFifo::Fifo1] {
-            match board.control_can().receive(fifo) {
+            match can_gateway.control_can().receive(fifo) {
                 Ok(rx_frame) => {
                     brake.process_rx_frame(&rx_frame, &mut debug_console);
                     throttle.process_rx_frame(&rx_frame, &mut debug_console);
@@ -152,28 +153,23 @@ fn main() -> ! {
             }
         }
 
-        brake.check_for_faults(&timer_ms, &mut debug_console, &mut board);
+        brake.check_for_faults(&timer_ms, &mut debug_console, &mut can_gateway);
         if let Some(throttle_fault) = throttle.check_for_faults(&timer_ms, &mut debug_console) {
-            let _ = board.publish_fault_report(throttle_fault); // TODO - high-level publish error handling
+            let _ = can_gateway.publish_fault_report(throttle_fault); // TODO - high-level publish error handling
         }
-        steering.check_for_faults(&timer_ms, &mut debug_console, &mut board);
+        steering.check_for_faults(&timer_ms, &mut debug_console, &mut can_gateway);
 
-        // poll both OBD CAN FIFOs
-        for fifo in &[RxFifo::Fifo0, RxFifo::Fifo1] {
-            if let Ok(rx_frame) = board.obd_can().receive(fifo) {
-                can_gateway.republish_obd_frame_to_control_can_bus(&rx_frame, &mut board);
-            }
-        }
+        can_gateway.republish_obd_frames_to_control_can_bus();
 
         // TODO - just polling the publish timer for now
         // we can also drive this logic from the interrupt
         // handler if the objects are global and atomic
-        if board.can_publish_timer.wait().is_ok() {
+        if can_gateway.wait_for_publish() {
             board.leds[led::Color::Green].toggle();
 
-            brake.publish_brake_report(&mut board);
-            throttle.publish_throttle_report(&mut board);
-            steering.publish_steering_report(&mut board);
+            brake.publish_brake_report(&mut can_gateway);
+            throttle.publish_throttle_report(&mut can_gateway);
+            steering.publish_steering_report(&mut can_gateway);
         }
 
         // TODO - do anything with the user button?
