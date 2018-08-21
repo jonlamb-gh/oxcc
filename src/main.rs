@@ -140,14 +140,15 @@ fn main() -> ! {
         board.wdg.refresh();
 
         // poll both control CAN FIFOs
-        for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
+        for fifo in &[RxFifo::Fifo0, RxFifo::Fifo1] {
             match board.control_can().receive(fifo) {
                 Ok(rx_frame) => {
                     brake.process_rx_frame(&rx_frame, &mut debug_console);
                     throttle.process_rx_frame(&rx_frame, &mut debug_console);
                     steering.process_rx_frame(&rx_frame, &mut debug_console);
                 }
-                Err(_) => (), // TODO - CAN receive error handling
+                Err(e) => writeln!(debug_console, "CAN receive failure: {:?}", e)
+                    .expect(DEBUG_WRITE_FAILURE), // TODO - CAN receive error handling
             }
         }
 
@@ -158,7 +159,7 @@ fn main() -> ! {
         steering.check_for_faults(&timer_ms, &mut debug_console, &mut board);
 
         // poll both OBD CAN FIFOs
-        for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
+        for fifo in &[RxFifo::Fifo0, RxFifo::Fifo1] {
             if let Ok(rx_frame) = board.obd_can().receive(fifo) {
                 can_gateway.republish_obd_frame_to_control_can_bus(&rx_frame, &mut board);
             }
@@ -167,7 +168,7 @@ fn main() -> ! {
         // TODO - just polling the publish timer for now
         // we can also drive this logic from the interrupt
         // handler if the objects are global and atomic
-        if let Ok(_) = board.can_publish_timer.wait() {
+        if board.can_publish_timer.wait().is_ok() {
             board.leds[led::Color::Green].toggle();
 
             brake.publish_brake_report(&mut board);

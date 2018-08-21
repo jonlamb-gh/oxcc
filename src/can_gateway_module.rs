@@ -34,10 +34,8 @@ impl CanGatewayModule {
             }
         }
 
-        if is_a_match {
-            if let Err(_) = board.control_can().transmit(&frame) {
-                // TODO - error handling
-            }
+        if is_a_match && board.control_can().transmit(&frame).is_err() {
+            // TODO - error handling
         }
     }
 }
