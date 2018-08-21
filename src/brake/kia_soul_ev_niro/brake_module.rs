@@ -3,7 +3,6 @@
 use super::types::*;
 use board::BrakePedalPositionSensor;
 use brake_can_protocol::*;
-use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
@@ -19,78 +18,83 @@ use vehicle::*;
 
 // TODO - use some form of println! logging that prefixes with a module name?
 
-struct BrakeControlState {
+struct BrakeControlState<DTCS: DtcBitfield> {
     enabled: bool,
     operator_override: bool,
-    dtcs: u8,
+    dtcs: DTCS,
 }
 
-impl BrakeControlState {
-    pub const fn new() -> Self {
+impl<DTCS> BrakeControlState<DTCS>
+where
+    DTCS: DtcBitfield,
+{
+    pub const fn new(dtcs: DTCS) -> Self {
         BrakeControlState {
             enabled: false,
             operator_override: false,
-            dtcs: 0,
+            dtcs,
         }
     }
 }
 
 pub struct BrakeModule {
     brake_pedal_position: DualSignal<BrakePedalPositionSensor>,
-    control_state: BrakeControlState,
+    control_state: BrakeControlState<u8>,
     grounded_fault_state: FaultCondition,
     operator_override_state: FaultCondition,
     brake_report: OsccBrakeReport,
-    fault_report_frame: OsccFaultReportFrame,
+    fault_report: OsccFaultReport,
     brake_dac: BrakeDac,
     brake_pins: BrakePins,
 }
 
-impl BrakeModule {
+pub struct UnpreparedBrakeModule {
+    brake_module: BrakeModule,
+}
+
+impl UnpreparedBrakeModule {
     pub fn new(
         brake_dac: BrakeDac,
         brake_pins: BrakePins,
         brake_pedal_position_sensor: BrakePedalPositionSensor,
     ) -> Self {
-        BrakeModule {
-            brake_pedal_position: DualSignal::new(0, 0, brake_pedal_position_sensor),
-            control_state: BrakeControlState::new(),
-            grounded_fault_state: FaultCondition::new(),
-            operator_override_state: FaultCondition::new(),
-            brake_report: OsccBrakeReport::new(),
-            fault_report_frame: OsccFaultReportFrame::new(),
-            brake_dac,
-            brake_pins,
+        UnpreparedBrakeModule {
+            brake_module: BrakeModule {
+                brake_pedal_position: DualSignal::new(0, 0, brake_pedal_position_sensor),
+                control_state: BrakeControlState::new(u8::default()),
+                grounded_fault_state: FaultCondition::new(),
+                operator_override_state: FaultCondition::new(),
+                brake_report: OsccBrakeReport::new(),
+                fault_report: OsccFaultReport {
+                    fault_origin_id: FAULT_ORIGIN_BRAKE,
+                    dtcs: 0,
+                },
+                brake_dac,
+                brake_pins,
+            },
         }
     }
 
-    pub fn init_devices(&mut self) {
-        self.brake_spoof_enable().set_low();
-        self.brake_light_enable().set_low();
+    pub fn prepare_module(self) -> BrakeModule {
+        let mut brake_module = self.brake_module;
+        brake_module.brake_pins.spoof_enable.set_low();
+        brake_module.brake_pins.brake_light_enable.set_low();
+        brake_module
     }
+}
 
-    fn brake_spoof_enable(&mut self) -> &mut BrakeSpoofEnablePin {
-        &mut self.brake_pins.spoof_enable
-    }
-
-    fn brake_light_enable(&mut self) -> &mut BrakeLightEnablePin {
-        &mut self.brake_pins.brake_light_enable
-    }
-
-    fn brake_dac(&mut self) -> &mut BrakeDac {
-        &mut self.brake_dac
-    }
-
+impl BrakeModule {
     fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
-            let a = self.brake_pedal_position.low();
-            let b = self.brake_pedal_position.high();
-            self.brake_dac().output_ab(a, b);
+            self.brake_dac.output_ab(
+                self.brake_pedal_position.low(),
+                self.brake_pedal_position.high(),
+            );
 
-            self.brake_spoof_enable().set_low();
-            self.brake_light_enable().set_low();
+            self.brake_pins.spoof_enable.set_low();
+            self.brake_pins.brake_light_enable.set_low();
             self.control_state.enabled = false;
             writeln!(debug_console, "Brake control disabled");
         }
@@ -100,11 +104,12 @@ impl BrakeModule {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
-            let a = self.brake_pedal_position.low();
-            let b = self.brake_pedal_position.high();
-            self.brake_dac().output_ab(a, b);
+            self.brake_dac.output_ab(
+                self.brake_pedal_position.low(),
+                self.brake_pedal_position.high(),
+            );
 
-            self.brake_spoof_enable().set_high();
+            self.brake_pins.spoof_enable.set_high();
             self.control_state.enabled = true;
             writeln!(debug_console, "Brake control enabled");
         }
@@ -127,13 +132,13 @@ impl BrakeModule {
             if (spoof_high > BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
                 || (spoof_low > BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
             {
-                self.brake_light_enable().set_high();
+                self.brake_pins.brake_light_enable.set_high();
             } else {
-                self.brake_light_enable().set_low();
+                self.brake_pins.brake_light_enable.set_low();
             }
 
             // TODO - revisit this, enforce high->A, low->B
-            self.brake_dac().output_ab(spoof_high, spoof_low);
+            self.brake_dac.output_ab(spoof_high, spoof_low);
         }
     }
 
@@ -141,71 +146,75 @@ impl BrakeModule {
         &mut self,
         timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
-        can_gateway: &mut CanGatewayModule,
-    ) {
-        if self.control_state.enabled || self.control_state.dtcs > 0 {
-            self.brake_pedal_position.update();
+    ) -> Option<&OsccFaultReport> {
+        if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
+            // Assumes this module already went through the proper transition into a faulted
+            // and disabled state, and we do not want to double-report a possible duplicate
+            // fault.
+            return None;
+        }
 
-            let brake_pedal_position_average = self.brake_pedal_position.average();
+        self.brake_pedal_position.update();
 
-            let operator_overridden: bool =
-                self.operator_override_state.condition_exceeded_duration(
-                    brake_pedal_position_average >= BRAKE_PEDAL_OVERRIDE_THRESHOLD.into(),
-                    FAULT_HYSTERESIS,
-                    timer_ms,
-                );
+        let brake_pedal_position_average = self.brake_pedal_position.average();
 
-            let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
-                &self.brake_pedal_position,
-                FAULT_HYSTERESIS,
-                timer_ms,
+        let operator_overridden: bool = self.operator_override_state.condition_exceeded_duration(
+            brake_pedal_position_average >= BRAKE_PEDAL_OVERRIDE_THRESHOLD.into(),
+            FAULT_HYSTERESIS,
+            timer_ms,
+        );
+
+        let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
+            &self.brake_pedal_position,
+            FAULT_HYSTERESIS,
+            timer_ms,
+        );
+
+        // sensor pins tied to ground - a value of zero indicates disconnection
+        if inputs_grounded {
+            self.disable_control(debug_console);
+
+            self.control_state
+                .dtcs
+                .set(OSCC_BRAKE_DTC_INVALID_SENSOR_VAL);
+
+            self.update_fault_report();
+
+            writeln!(
+                debug_console,
+                "Bad value read from brake pedal position sensor"
             );
 
-            // sensor pins tied to ground - a value of zero indicates disconnection
-            if inputs_grounded {
-                self.disable_control(debug_console);
+            Some(&self.fault_report)
+        } else if operator_overridden && !self.control_state.operator_override {
+            // TODO - oxcc change, don't continously disable when override is already
+            // handled oscc throttle module doesn't allow for continious
+            // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
+            // but brake and steering do?
+            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
+            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
+            self.disable_control(debug_console);
 
-                self.control_state
-                    .dtcs
-                    .set(OSCC_BRAKE_DTC_INVALID_SENSOR_VAL);
+            self.control_state
+                .dtcs
+                .set(OSCC_BRAKE_DTC_OPERATOR_OVERRIDE);
 
-                self.publish_fault_report(can_gateway);
+            self.update_fault_report();
 
-                writeln!(
-                    debug_console,
-                    "Bad value read from brake pedal position sensor"
-                );
-            } else if operator_overridden && !self.control_state.operator_override {
-                // TODO - oxcc change, don't continously disable when override is already
-                // handled oscc throttle module doesn't allow for continious
-                // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
-                // but brake and steering do?
-                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
-                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
-                self.disable_control(debug_console);
+            self.control_state.operator_override = true;
 
-                self.control_state
-                    .dtcs
-                    .set(OSCC_BRAKE_DTC_OPERATOR_OVERRIDE);
+            writeln!(debug_console, "Brake operator override");
 
-                self.publish_fault_report(can_gateway);
-
-                self.control_state.operator_override = true;
-
-                writeln!(debug_console, "Brake operator override");
-            } else {
-                self.control_state.dtcs = 0;
-                self.control_state.operator_override = false;
-            }
+            Some(&self.fault_report)
+        } else {
+            self.control_state.dtcs.clear_all();
+            self.control_state.operator_override = false;
+            None
         }
     }
 
-    pub fn publish_fault_report(&mut self, can_gateway: &mut CanGatewayModule) {
-        self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_BRAKE;
-        self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
-
-        self.fault_report_frame
-            .transmit(&mut can_gateway.control_can());
+    fn update_fault_report(&mut self) {
+        self.fault_report.dtcs = self.control_state.dtcs;
     }
 
     pub fn supply_brake_report(&mut self) -> &OsccBrakeReport {

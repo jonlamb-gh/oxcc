@@ -168,10 +168,12 @@ impl ThrottleModule {
                 .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
 
             self.update_fault_report();
+
             writeln!(
                 debug_console,
                 "Bad value read from accelerator position sensor"
             );
+
             Some(&self.fault_report)
         } else if operator_overridden && !self.control_state.operator_override {
             // TODO - oxcc change, don't continously disable when override is already
@@ -187,8 +189,11 @@ impl ThrottleModule {
                 .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
             self.update_fault_report();
+
             self.control_state.operator_override = true;
+
             writeln!(debug_console, "Throttle operator override");
+
             Some(&self.fault_report)
         } else {
             self.control_state.dtcs.clear_all();

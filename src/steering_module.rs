@@ -18,25 +18,28 @@ use vehicle::*;
 
 const FILTER_ALPHA: f32 = 0.01_f32;
 
-struct SteeringControlState {
+struct SteeringControlState<DTCS: DtcBitfield> {
     enabled: bool,
     operator_override: bool,
-    dtcs: u8,
+    dtcs: DTCS,
 }
 
-impl SteeringControlState {
-    pub const fn new() -> Self {
+impl<DTCS> SteeringControlState<DTCS>
+where
+    DTCS: DtcBitfield,
+{
+    pub const fn new(dtcs: DTCS) -> Self {
         SteeringControlState {
             enabled: false,
             operator_override: false,
-            dtcs: 0,
+            dtcs,
         }
     }
 }
 
 pub struct SteeringModule {
     steering_torque: DualSignal<TorqueSensor>,
-    control_state: SteeringControlState,
+    control_state: SteeringControlState<u8>,
     grounded_fault_state: FaultCondition,
     filtered_diff: u16,
     steering_report: OsccSteeringReport,
@@ -45,31 +48,41 @@ pub struct SteeringModule {
     steering_pins: SteeringPins,
 }
 
-impl SteeringModule {
+pub struct UnpreparedSteeringModule {
+    steering_module: SteeringModule,
+}
+
+impl UnpreparedSteeringModule {
     pub fn new(
         torque_sensor: TorqueSensor,
         steering_dac: SteeringDac,
         steering_pins: SteeringPins,
     ) -> Self {
-        SteeringModule {
-            steering_torque: DualSignal::new(0, 0, torque_sensor),
-            control_state: SteeringControlState::new(),
-            grounded_fault_state: FaultCondition::new(),
-            filtered_diff: 0,
-            steering_report: OsccSteeringReport::new(),
-            fault_report: OsccFaultReport {
-                fault_origin_id: FAULT_ORIGIN_STEERING,
-                dtcs: 0,
+        UnpreparedSteeringModule {
+            steering_module: SteeringModule {
+                steering_torque: DualSignal::new(0, 0, torque_sensor),
+                control_state: SteeringControlState::new(u8::default()),
+                grounded_fault_state: FaultCondition::new(),
+                filtered_diff: 0,
+                steering_report: OsccSteeringReport::new(),
+                fault_report: OsccFaultReport {
+                    fault_origin_id: FAULT_ORIGIN_STEERING,
+                    dtcs: 0,
+                },
+                steering_dac,
+                steering_pins,
             },
-            steering_dac,
-            steering_pins,
         }
     }
 
-    pub fn init_devices(&mut self) {
-        self.steering_pins.spoof_enable.set_low();
+    pub fn prepare_module(self) -> SteeringModule {
+        let mut steering_module = self.steering_module;
+        steering_module.steering_pins.spoof_enable.set_low();
+        steering_module
     }
+}
 
+impl SteeringModule {
     pub fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.steering_torque.prevent_signal_discontinuity();
@@ -115,91 +128,88 @@ impl SteeringModule {
         }
     }
 
-    pub fn check_for_faults<P: FaultReportPublisher>(
+    pub fn check_for_faults(
         &mut self,
         timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
-        fault_report_publisher: &mut P,
-    ) {
-        if self.control_state.enabled || self.control_state.dtcs > 0 {
-            self.read_torque_sensor();
-
-            let unfiltered_diff = self.steering_torque.diff();
-
-            if self.filtered_diff == 0 {
-                self.filtered_diff = unfiltered_diff;
-            }
-
-            // TODO - revist this
-            // OSCC goes back and forth with u16 and f32 types
-            self.filtered_diff = self.exponential_moving_average(
-                FILTER_ALPHA,
-                f32::from(unfiltered_diff),
-                f32::from(self.filtered_diff),
-            ) as _;
-
-            let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
-                &self.steering_torque,
-                FAULT_HYSTERESIS,
-                timer_ms,
-            );
-
-            // sensor pins tied to ground - a value of zero indicates disconnection
-            if inputs_grounded {
-                self.disable_control(debug_console);
-
-                self.control_state
-                    .dtcs
-                    .set(OSCC_STEERING_DTC_INVALID_SENSOR_VAL);
-
-                if fault_report_publisher
-                    .publish_fault_report(self.supply_fault_report())
-                    .is_err()
-                {
-                    // TODO - publish error handling
-                }
-
-                writeln!(debug_console, "Bad value read from torque sensor");
-            } else if (self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD)
-                && !self.control_state.operator_override
-            {
-                // TODO - oxcc change, don't continously disable when override is already
-                // handled oscc throttle module doesn't allow for continious
-                // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
-                // but brake and steering do?
-                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
-                // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
-                self.disable_control(debug_console);
-
-                self.control_state
-                    .dtcs
-                    .set(OSCC_STEERING_DTC_OPERATOR_OVERRIDE);
-
-                if fault_report_publisher
-                    .publish_fault_report(self.supply_fault_report())
-                    .is_err()
-                {
-                    // TODO - publish error handling
-                }
-
-                self.control_state.operator_override = true;
-
-                writeln!(debug_console, "Steering operator override");
-            } else {
-                self.control_state.dtcs = 0;
-                self.control_state.operator_override = false;
-            }
+    ) -> Option<&OsccFaultReport> {
+        if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
+            // Assumes this module already went through the proper transition into a faulted
+            // and disabled state, and we do not want to double-report a possible duplicate
+            // fault.
+            return None;
         }
+
+        self.steering_torque.update();
+
+        let unfiltered_diff = self.steering_torque.diff();
+
+        if self.filtered_diff == 0 {
+            self.filtered_diff = unfiltered_diff;
+        }
+
+        // TODO - revist this
+        // OSCC goes back and forth with u16 and f32 types
+        self.filtered_diff = self.exponential_moving_average(
+            FILTER_ALPHA,
+            f32::from(unfiltered_diff),
+            f32::from(self.filtered_diff),
+        ) as _;
+
+        let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
+            &self.steering_torque,
+            FAULT_HYSTERESIS,
+            timer_ms,
+        );
+
+        // sensor pins tied to ground - a value of zero indicates disconnection
+        if inputs_grounded {
+            self.disable_control(debug_console);
+
+            self.control_state
+                .dtcs
+                .set(OSCC_STEERING_DTC_INVALID_SENSOR_VAL);
+
+            self.update_fault_report();
+
+            writeln!(debug_console, "Bad value read from torque sensor");
+
+            Some(&self.fault_report)
+        } else if (self.filtered_diff > TORQUE_DIFFERENCE_OVERRIDE_THRESHOLD)
+            && !self.control_state.operator_override
+        {
+            // TODO - oxcc change, don't continously disable when override is already
+            // handled oscc throttle module doesn't allow for continious
+            // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
+            // but brake and steering do?
+            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
+            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
+            self.disable_control(debug_console);
+
+            self.control_state
+                .dtcs
+                .set(OSCC_STEERING_DTC_OPERATOR_OVERRIDE);
+
+            self.update_fault_report();
+
+            self.control_state.operator_override = true;
+
+            writeln!(debug_console, "Steering operator override");
+
+            Some(&self.fault_report)
+        } else {
+            self.control_state.dtcs.clear_all();
+            self.control_state.operator_override = false;
+            None
+        }
+    }
+
+    fn update_fault_report(&mut self) {
+        self.fault_report.dtcs = self.control_state.dtcs;
     }
 
     fn exponential_moving_average(&self, alpha: f32, input: f32, average: f32) -> f32 {
         (alpha * input) + ((1.0 - alpha) * average)
-    }
-
-    fn supply_fault_report(&mut self) -> &OsccFaultReport {
-        self.fault_report.fault_origin_id = FAULT_ORIGIN_STEERING;
-        self.fault_report.dtcs = self.control_state.dtcs;
-        &self.fault_report
     }
 
     pub fn supply_steering_report(&mut self) -> &OsccSteeringReport {
@@ -266,9 +276,5 @@ impl SteeringModule {
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
         self.update_steering(spoof_value_high, spoof_value_low);
-    }
-
-    fn read_torque_sensor(&mut self) {
-        self.steering_torque.update();
     }
 }
