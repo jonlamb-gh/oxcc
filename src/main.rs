@@ -61,6 +61,9 @@ use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use fault_can_protocol::FaultReportPublisher;
+use brake_can_protocol::BrakeReportPublisher;
+use steering_can_protocol::SteeringReportPublisher;
+use throttle_can_protocol::ThrottleReportPublisher;
 use nucleo_f767zi::hal::can::RxFifo;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
@@ -132,9 +135,15 @@ fn main() -> ! {
     steering.init_devices();
 
     // send reports immediately
-    brake.publish_brake_report(&mut can_gateway);
-    throttle.publish_throttle_report(&mut can_gateway);
-    steering.publish_steering_report(&mut can_gateway);
+    // TODO - high-level publish error handling
+    let _ = can_gateway.publish_brake_report(
+        brake.supply_brake_report());
+
+    let _ = can_gateway.publish_throttle_report(
+        throttle.supply_throttle_report());
+
+    let _ = can_gateway.publish_steering_report(
+        steering.supply_steering_report());
 
     loop {
         // refresh the independent watchdog
@@ -148,28 +157,36 @@ fn main() -> ! {
                     throttle.process_rx_frame(&rx_frame, &mut debug_console);
                     steering.process_rx_frame(&rx_frame, &mut debug_console);
                 }
-                Err(e) => writeln!(debug_console, "CAN receive failure: {:?}", e)
-                    .expect(DEBUG_WRITE_FAILURE), // TODO - CAN receive error handling
+                // TODO - CAN receive error handling
+                // includes BufferExhausted, which means no data available
+                Err(_) => {},
+                //Err(e) => writeln!(debug_console, "CAN receive failure: {:?}", e)
+                //    .expect(DEBUG_WRITE_FAILURE), // TODO - CAN receive error handling
             }
         }
 
         brake.check_for_faults(&timer_ms, &mut debug_console, &mut can_gateway);
         if let Some(throttle_fault) = throttle.check_for_faults(&timer_ms, &mut debug_console) {
-            let _ = can_gateway.publish_fault_report(throttle_fault); // TODO - high-level publish error handling
+            // TODO - high-level publish error handling
+            let _ = can_gateway.publish_fault_report(throttle_fault);
         }
         steering.check_for_faults(&timer_ms, &mut debug_console, &mut can_gateway);
 
         can_gateway.republish_obd_frames_to_control_can_bus();
 
-        // TODO - just polling the publish timer for now
-        // we can also drive this logic from the interrupt
-        // handler if the objects are global and atomic
+        // periodically publish all report frames
         if can_gateway.wait_for_publish() {
             board.leds[led::Color::Green].toggle();
 
-            brake.publish_brake_report(&mut can_gateway);
-            throttle.publish_throttle_report(&mut can_gateway);
-            steering.publish_steering_report(&mut can_gateway);
+            // TODO - high-level publish error handling
+            let _ = can_gateway.publish_brake_report(
+                brake.supply_brake_report());
+
+            let _ = can_gateway.publish_throttle_report(
+                throttle.supply_throttle_report());
+
+            let _ = can_gateway.publish_steering_report(
+                steering.supply_steering_report());
         }
 
         // TODO - do anything with the user button?

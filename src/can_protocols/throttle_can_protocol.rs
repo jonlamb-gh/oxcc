@@ -1,6 +1,4 @@
-use board::ControlCan;
-use nucleo_f767zi::hal::can::{BaseID, DataFrame, ID};
-use oscc_magic_byte::*;
+use nucleo_f767zi::hal::can::{BaseID, CanError, DataFrame, ID};
 
 pub const OSCC_THROTTLE_ENABLE_CAN_ID: u16 = 0x90;
 pub const OSCC_THROTTLE_DISABLE_CAN_ID: u16 = 0x91;
@@ -34,41 +32,29 @@ impl<'a> From<&'a DataFrame> for OsccThrottleCommand {
 }
 
 pub struct OsccThrottleReport {
-    can_frame: DataFrame,
     pub enabled: bool,
     pub operator_override: bool,
     pub dtcs: u8,
 }
 
+pub trait ThrottleReportSupplier {
+    fn supply_throttle_report(&mut self) -> &OsccThrottleReport;
+}
+
+pub trait ThrottleReportPublisher {
+    fn publish_throttle_report(&mut self, throttle_report: &OsccThrottleReport) -> Result<(), CanError>;
+}
+
+pub fn default_throttle_report_data_frame() -> DataFrame {
+    DataFrame::new(ID::BaseID(BaseID::new(OSCC_THROTTLE_REPORT_CAN_ID)))
+}
+
 impl OsccThrottleReport {
     pub fn new() -> Self {
         OsccThrottleReport {
-            can_frame: DataFrame::new(ID::BaseID(BaseID::new(OSCC_THROTTLE_REPORT_CAN_ID))),
             enabled: false,
             operator_override: false,
             dtcs: 0,
         }
-    }
-
-    // TODO - error handling
-    pub fn transmit(&mut self, can: &mut ControlCan) {
-        self.update_can_frame();
-
-        if can.transmit(&self.can_frame.into()).is_err() {
-            // TODO
-        }
-    }
-
-    fn update_can_frame(&mut self) {
-        self.can_frame
-            .set_data_length(OSCC_THROTTLE_REPORT_CAN_DLC as _);
-
-        let data = self.can_frame.data_as_mut();
-
-        data[0] = OSCC_MAGIC_BYTE_0;
-        data[1] = OSCC_MAGIC_BYTE_1;
-        data[2] = self.enabled as _;
-        data[3] = self.operator_override as _;
-        data[4] = self.dtcs;
     }
 }

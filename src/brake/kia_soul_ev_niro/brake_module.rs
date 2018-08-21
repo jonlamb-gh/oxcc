@@ -200,20 +200,19 @@ impl BrakeModule {
         }
     }
 
-    pub fn publish_brake_report(&mut self, can_gateway: &mut CanGatewayModule) {
-        self.brake_report.enabled = self.control_state.enabled;
-        self.brake_report.operator_override = self.control_state.operator_override;
-        self.brake_report.dtcs = self.control_state.dtcs;
-
-        self.brake_report.transmit(&mut can_gateway.control_can());
-    }
-
     pub fn publish_fault_report(&mut self, can_gateway: &mut CanGatewayModule) {
         self.fault_report_frame.fault_report.fault_origin_id = FAULT_ORIGIN_BRAKE;
         self.fault_report_frame.fault_report.dtcs = self.control_state.dtcs;
 
         self.fault_report_frame
             .transmit(&mut can_gateway.control_can());
+    }
+
+    pub fn supply_brake_report(&mut self) -> &OsccBrakeReport {
+        self.brake_report.enabled = self.control_state.enabled;
+        self.brake_report.operator_override = self.control_state.operator_override;
+        self.brake_report.dtcs = self.control_state.dtcs;
+        &self.brake_report
     }
 
     // TODO - error handling
