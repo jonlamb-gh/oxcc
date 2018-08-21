@@ -233,7 +233,7 @@ impl FullBoard {
             (can1_tx, can1_rx),
             &mut rcc.apb1,
             &config::CONTROL_CAN_CONFIG,
-        ).expect("Failed to configure ontrol CAN (CAN1)");
+        ).expect("Failed to configure control CAN (CAN1)");
 
         let obd_can = Can::can2(
             peripherals.CAN2,

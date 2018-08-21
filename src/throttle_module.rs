@@ -48,30 +48,41 @@ pub struct ThrottleModule {
     throttle_pins: ThrottlePins,
 }
 
-impl ThrottleModule {
-    pub fn new(
+pub struct UnpreparedThrottleModule {
+    throttle_module: ThrottleModule,
+}
+
+impl UnpreparedThrottleModule {
+    pub fn new (
         accelerator_position_sensor: AcceleratorPositionSensor,
         throttle_dac: ThrottleDac,
         throttle_pins: ThrottlePins,
-    ) -> Self {
-        ThrottleModule {
-            accelerator_position: DualSignal::new(0, 0, accelerator_position_sensor),
-            control_state: ThrottleControlState::new(u8::default()),
-            grounded_fault_state: FaultCondition::new(),
-            operator_override_state: FaultCondition::new(),
-            throttle_report: OsccThrottleReport::new(),
-            fault_report: OsccFaultReport {
-                fault_origin_id: FAULT_ORIGIN_THROTTLE,
-                dtcs: 0,
+    ) -> UnpreparedThrottleModule {
+        UnpreparedThrottleModule {
+            throttle_module: ThrottleModule {
+                accelerator_position: DualSignal::new(0, 0, accelerator_position_sensor),
+                control_state: ThrottleControlState::new(u8::default()),
+                grounded_fault_state: FaultCondition::new(),
+                operator_override_state: FaultCondition::new(),
+                throttle_report: OsccThrottleReport::new(),
+                fault_report: OsccFaultReport {
+                    fault_origin_id: FAULT_ORIGIN_THROTTLE,
+                    dtcs: 0,
+                },
+                throttle_dac,
+                throttle_pins,
             },
-            throttle_dac,
-            throttle_pins,
         }
     }
 
-    pub fn init_devices(&mut self) {
-        self.throttle_pins.spoof_enable.set_low();
+    pub fn prepare_module(self) -> ThrottleModule {
+        let mut throttle_module = self.throttle_module;
+        throttle_module.throttle_pins.spoof_enable.set_low();
+        throttle_module
     }
+}
+
+impl ThrottleModule {
 
     fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {

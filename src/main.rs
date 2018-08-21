@@ -66,7 +66,7 @@ use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
 use steering_module::SteeringModule;
-use throttle_module::ThrottleModule;
+use throttle_module::UnpreparedThrottleModule;
 
 const DEBUG_WRITE_FAILURE: &str = "Failed to write to debug_console";
 
@@ -120,13 +120,13 @@ fn main() -> ! {
     }
 
     let mut brake = BrakeModule::new(brake_dac, brake_pins, brake_pedal_position_sensor);
-    let mut throttle =
-        ThrottleModule::new(accelerator_position_sensor, throttle_dac, throttle_pins);
+    let unprepared_throttle_module =
+        UnpreparedThrottleModule::new(accelerator_position_sensor, throttle_dac, throttle_pins);
     let mut steering = SteeringModule::new(torque_sensor, steering_dac, steering_pins);
     let mut can_gateway = CanGatewayModule::new();
 
     brake.init_devices();
-    throttle.init_devices();
+    let mut throttle = unprepared_throttle_module.prepare_module();
     steering.init_devices();
     can_gateway.init_devices(&mut board);
 
