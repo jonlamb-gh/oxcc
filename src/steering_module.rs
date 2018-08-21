@@ -1,6 +1,7 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/steering
 
-use board::{Board, TorqueSensor};
+use board::TorqueSensor;
+use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
@@ -196,12 +197,13 @@ impl SteeringModule {
         (alpha * input) + ((1.0 - alpha) * average)
     }
 
-    pub fn publish_steering_report(&mut self, board: &mut Board) {
+    pub fn publish_steering_report(&mut self, can_gateway: &mut CanGatewayModule) {
         self.steering_report.enabled = self.control_state.enabled;
         self.steering_report.operator_override = self.control_state.operator_override;
         self.steering_report.dtcs = self.control_state.dtcs;
 
-        self.steering_report.transmit(&mut board.control_can());
+        self.steering_report
+            .transmit(&mut can_gateway.control_can());
     }
 
     fn supply_fault_report(&mut self) -> &OsccFaultReport {
