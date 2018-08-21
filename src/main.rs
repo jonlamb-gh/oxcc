@@ -60,12 +60,15 @@ use board::{hard_fault_indicator, FullBoard};
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
+use fault_can_protocol::FaultReportPublisher;
 use nucleo_f767zi::hal::can::RxFifo;
 use nucleo_f767zi::hal::prelude::*;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
 use steering_module::SteeringModule;
 use throttle_module::ThrottleModule;
+
+const DEBUG_WRITE_FAILURE: &str = "Failed to write to debug_console";
 
 entry!(main);
 
@@ -96,22 +99,23 @@ fn main() -> ! {
         writeln!(debug_console, "oxcc is running").unwrap();
 
         if board.reset_conditions.low_power {
-            writeln!(debug_console, "WARNING: low-power reset detected").unwrap();
+            writeln!(debug_console, "WARNING: low-power reset detected")
+                .expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.window_watchdog || board.reset_conditions.independent_watchdog {
-            writeln!(debug_console, "WARNING: watchdog reset detected").unwrap();
+            writeln!(debug_console, "WARNING: watchdog reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.software {
-            writeln!(debug_console, "WARNING: software reset detected").unwrap();
+            writeln!(debug_console, "WARNING: software reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.por_pdr {
-            writeln!(debug_console, "WARNING: POR/PDR reset detected").unwrap();
+            writeln!(debug_console, "WARNING: POR/PDR reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.pin {
-            writeln!(debug_console, "WARNING: PIN reset detected").unwrap();
+            writeln!(debug_console, "WARNING: PIN reset detected").expect(DEBUG_WRITE_FAILURE);
         }
         if board.reset_conditions.bor {
-            writeln!(debug_console, "WARNING: BOR reset detected").unwrap();
+            writeln!(debug_console, "WARNING: BOR reset detected").expect(DEBUG_WRITE_FAILURE);
         }
     }
 
@@ -137,15 +141,20 @@ fn main() -> ! {
 
         // poll both control CAN FIFOs
         for fifo in [RxFifo::Fifo0, RxFifo::Fifo1].iter() {
-            if let Ok(rx_frame) = board.control_can().receive(fifo) {
-                brake.process_rx_frame(&rx_frame, &mut debug_console);
-                throttle.process_rx_frame(&rx_frame, &mut debug_console);
-                steering.process_rx_frame(&rx_frame, &mut debug_console);
+            match board.control_can().receive(fifo) {
+                Ok(rx_frame) => {
+                    brake.process_rx_frame(&rx_frame, &mut debug_console);
+                    throttle.process_rx_frame(&rx_frame, &mut debug_console);
+                    steering.process_rx_frame(&rx_frame, &mut debug_console);
+                }
+                Err(_) => (), // TODO - CAN receive error handling
             }
         }
 
         brake.check_for_faults(&timer_ms, &mut debug_console, &mut board);
-        throttle.check_for_faults(&timer_ms, &mut debug_console, &mut board);
+        if let Some(throttle_fault) = throttle.check_for_faults(&timer_ms, &mut debug_console) {
+            let _ = board.publish_fault_report(throttle_fault); // TODO - high-level publish error handling
+        }
         steering.check_for_faults(&timer_ms, &mut debug_console, &mut board);
 
         // poll both OBD CAN FIFOs

@@ -74,8 +74,10 @@ impl FullBoard {
         // read the RCC reset condition flags before anything else
         let reset_conditions = ResetConditions::read_and_clear();
 
-        let mut core_peripherals = cortex_m::Peripherals::take().unwrap();
-        let peripherals = stm32f7x7::Peripherals::take().unwrap();
+        let mut core_peripherals =
+            cortex_m::Peripherals::take().expect("Failed to take cortex_m::Peripherals");
+        let peripherals =
+            stm32f7x7::Peripherals::take().expect("Failed to take stm32f7x7::Peripherals");
 
         core_peripherals.SCB.enable_icache();
         core_peripherals
