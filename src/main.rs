@@ -57,17 +57,17 @@ mod brake_module;
 mod brake_module;
 
 use board::{hard_fault_indicator, FullBoard};
+use brake_can_protocol::BrakeReportPublisher;
 use brake_module::BrakeModule;
 use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use fault_can_protocol::FaultReportPublisher;
-use brake_can_protocol::BrakeReportPublisher;
-use steering_can_protocol::SteeringReportPublisher;
-use throttle_can_protocol::ThrottleReportPublisher;
 use nucleo_f767zi::hal::can::RxFifo;
 use nucleo_f767zi::led;
 use rt::ExceptionFrame;
+use steering_can_protocol::SteeringReportPublisher;
 use steering_module::SteeringModule;
+use throttle_can_protocol::ThrottleReportPublisher;
 use throttle_module::UnpreparedThrottleModule;
 
 const DEBUG_WRITE_FAILURE: &str = "Failed to write to debug_console";
@@ -136,14 +136,11 @@ fn main() -> ! {
 
     // send reports immediately
     // TODO - high-level publish error handling
-    let _ = can_gateway.publish_brake_report(
-        brake.supply_brake_report());
+    let _ = can_gateway.publish_brake_report(brake.supply_brake_report());
 
-    let _ = can_gateway.publish_throttle_report(
-        throttle.supply_throttle_report());
+    let _ = can_gateway.publish_throttle_report(throttle.supply_throttle_report());
 
-    let _ = can_gateway.publish_steering_report(
-        steering.supply_steering_report());
+    let _ = can_gateway.publish_steering_report(steering.supply_steering_report());
 
     loop {
         // refresh the independent watchdog
@@ -159,9 +156,9 @@ fn main() -> ! {
                 }
                 // TODO - CAN receive error handling
                 // includes BufferExhausted, which means no data available
-                Err(_) => {},
-                //Err(e) => writeln!(debug_console, "CAN receive failure: {:?}", e)
-                //    .expect(DEBUG_WRITE_FAILURE), // TODO - CAN receive error handling
+                Err(_) => {}
+                /*Err(e) => writeln!(debug_console, "CAN receive failure: {:?}", e)
+                 *    .expect(DEBUG_WRITE_FAILURE), // TODO - CAN receive error handling */
             }
         }
 
@@ -179,14 +176,11 @@ fn main() -> ! {
             board.leds[led::Color::Green].toggle();
 
             // TODO - high-level publish error handling
-            let _ = can_gateway.publish_brake_report(
-                brake.supply_brake_report());
+            let _ = can_gateway.publish_brake_report(brake.supply_brake_report());
 
-            let _ = can_gateway.publish_throttle_report(
-                throttle.supply_throttle_report());
+            let _ = can_gateway.publish_throttle_report(throttle.supply_throttle_report());
 
-            let _ = can_gateway.publish_steering_report(
-                steering.supply_steering_report());
+            let _ = can_gateway.publish_steering_report(steering.supply_steering_report());
         }
 
         // TODO - do anything with the user button?

@@ -138,7 +138,8 @@ impl ThrottleModule {
     ) -> Option<&OsccFaultReport> {
         if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
             // Assumes this module already went through the proper transition into a faulted
-            // and disabled state, and we do not want to double-report a possible duplicate fault.
+            // and disabled state, and we do not want to double-report a possible duplicate
+            // fault.
             return None;
         }
 

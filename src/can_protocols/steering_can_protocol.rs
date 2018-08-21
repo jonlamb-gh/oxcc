@@ -42,7 +42,10 @@ pub trait SteeringReportSupplier {
 }
 
 pub trait SteeringReportPublisher {
-    fn publish_steering_report(&mut self, brake_report: &OsccSteeringReport) -> Result<(), CanError>;
+    fn publish_steering_report(
+        &mut self,
+        brake_report: &OsccSteeringReport,
+    ) -> Result<(), CanError>;
 }
 
 pub fn default_steering_report_data_frame() -> DataFrame {

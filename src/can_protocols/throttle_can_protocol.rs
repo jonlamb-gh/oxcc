@@ -42,7 +42,10 @@ pub trait ThrottleReportSupplier {
 }
 
 pub trait ThrottleReportPublisher {
-    fn publish_throttle_report(&mut self, throttle_report: &OsccThrottleReport) -> Result<(), CanError>;
+    fn publish_throttle_report(
+        &mut self,
+        throttle_report: &OsccThrottleReport,
+    ) -> Result<(), CanError>;
 }
 
 pub fn default_throttle_report_data_frame() -> DataFrame {

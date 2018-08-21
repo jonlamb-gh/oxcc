@@ -1,12 +1,12 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/can_gateway
 
-use fault_can_protocol::*;
 use brake_can_protocol::*;
-use throttle_can_protocol::*;
-use steering_can_protocol::*;
+use fault_can_protocol::*;
 use nucleo_f767zi::hal::can::{CanError, CanFrame, DataFrame, RxFifo};
 use nucleo_f767zi::hal::prelude::*;
 use oscc_magic_byte::*;
+use steering_can_protocol::*;
+use throttle_can_protocol::*;
 use types::*;
 use vehicle::*;
 
@@ -128,7 +128,10 @@ impl BrakeReportPublisher for CanGatewayModule {
 }
 
 impl ThrottleReportPublisher for CanGatewayModule {
-    fn publish_throttle_report(&mut self, throttle_report: &OsccThrottleReport) -> Result<(), CanError> {
+    fn publish_throttle_report(
+        &mut self,
+        throttle_report: &OsccThrottleReport,
+    ) -> Result<(), CanError> {
         {
             self.throttle_report_can_frame
                 .set_data_length(OSCC_THROTTLE_REPORT_CAN_DLC as _);
@@ -148,7 +151,10 @@ impl ThrottleReportPublisher for CanGatewayModule {
 }
 
 impl SteeringReportPublisher for CanGatewayModule {
-    fn publish_steering_report(&mut self, steering_report: &OsccSteeringReport) -> Result<(), CanError> {
+    fn publish_steering_report(
+        &mut self,
+        steering_report: &OsccSteeringReport,
+    ) -> Result<(), CanError> {
         {
             self.steering_report_can_frame
                 .set_data_length(OSCC_STEERING_REPORT_CAN_DLC as _);
