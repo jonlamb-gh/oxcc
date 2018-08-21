@@ -1,6 +1,7 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/throttle
 
-use board::{AcceleratorPositionSensor, Board};
+use board::AcceleratorPositionSensor;
+use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
@@ -53,7 +54,7 @@ pub struct UnpreparedThrottleModule {
 }
 
 impl UnpreparedThrottleModule {
-    pub fn new (
+    pub fn new(
         accelerator_position_sensor: AcceleratorPositionSensor,
         throttle_dac: ThrottleDac,
         throttle_pins: ThrottlePins,
@@ -83,7 +84,6 @@ impl UnpreparedThrottleModule {
 }
 
 impl ThrottleModule {
-
     fn disable_control(&mut self, debug_console: &mut DebugConsole) {
         if self.control_state.enabled {
             self.accelerator_position.prevent_signal_discontinuity();
@@ -199,12 +199,13 @@ impl ThrottleModule {
         }
     }
 
-    pub fn publish_throttle_report(&mut self, board: &mut Board) {
+    pub fn publish_throttle_report(&mut self, can_gateway: &mut CanGatewayModule) {
         self.throttle_report.enabled = self.control_state.enabled;
         self.throttle_report.operator_override = self.control_state.operator_override;
         self.throttle_report.dtcs = self.control_state.dtcs;
 
-        self.throttle_report.transmit(&mut board.control_can());
+        self.throttle_report
+            .transmit(&mut can_gateway.control_can());
     }
 
     fn update_fault_report(&mut self) {
