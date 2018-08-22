@@ -4,7 +4,7 @@ use nucleo_f767zi::hal::gpio::gpioa::{PA15, PA4, PA5, PA6, PA7};
 use nucleo_f767zi::hal::gpio::gpiob::{PB10, PB12, PB13, PB15, PB4};
 use nucleo_f767zi::hal::gpio::gpioc::{PC10, PC11, PC12, PC2};
 use nucleo_f767zi::hal::gpio::gpiod::{PD0, PD1, PD10, PD11, PD12, PD13};
-use nucleo_f767zi::hal::gpio::{AF5, AF9, Output, PushPull};
+use nucleo_f767zi::hal::gpio::{Output, PushPull, AF5, AF9};
 use nucleo_f767zi::hal::spi::Spi;
 use nucleo_f767zi::hal::stm32f7x7::{CAN1, CAN2, SPI1, SPI2, SPI3, TIM2};
 use nucleo_f767zi::hal::timer::Timer;

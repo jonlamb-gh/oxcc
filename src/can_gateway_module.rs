@@ -1,9 +1,12 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/can_gateway
 
+use brake_can_protocol::*;
 use fault_can_protocol::*;
 use nucleo_f767zi::hal::can::{CanError, CanFrame, DataFrame, RxFifo};
 use nucleo_f767zi::hal::prelude::*;
 use oscc_magic_byte::*;
+use steering_can_protocol::*;
+use throttle_can_protocol::*;
 use types::*;
 use vehicle::*;
 
@@ -14,6 +17,9 @@ pub struct CanGatewayModule {
     control_can: ControlCan,
     obd_can: ObdCan,
     fault_report_can_frame: DataFrame,
+    throttle_report_can_frame: DataFrame,
+    brake_report_can_frame: DataFrame,
+    steering_report_can_frame: DataFrame,
 }
 
 impl CanGatewayModule {
@@ -27,6 +33,9 @@ impl CanGatewayModule {
             control_can,
             obd_can,
             fault_report_can_frame: default_fault_report_data_frame(),
+            brake_report_can_frame: default_brake_report_data_frame(),
+            throttle_report_can_frame: default_throttle_report_data_frame(),
+            steering_report_can_frame: default_steering_report_data_frame(),
         }
     }
     pub fn republish_obd_frames_to_control_can_bus(&mut self) {
@@ -95,5 +104,71 @@ impl FaultReportPublisher for CanGatewayModule {
 
         self.control_can
             .transmit(&self.fault_report_can_frame.into())
+    }
+}
+
+impl BrakeReportPublisher for CanGatewayModule {
+    fn publish_brake_report(&mut self, brake_report: &OsccBrakeReport) -> Result<(), CanError> {
+        {
+            self.brake_report_can_frame
+                .set_data_length(OSCC_BRAKE_REPORT_CAN_DLC as _);
+
+            let data = self.brake_report_can_frame.data_as_mut();
+
+            data[0] = OSCC_MAGIC_BYTE_0;
+            data[1] = OSCC_MAGIC_BYTE_1;
+            data[2] = brake_report.enabled as _;
+            data[3] = brake_report.operator_override as _;
+            data[4] = brake_report.dtcs;
+        }
+
+        self.control_can
+            .transmit(&self.brake_report_can_frame.into())
+    }
+}
+
+impl ThrottleReportPublisher for CanGatewayModule {
+    fn publish_throttle_report(
+        &mut self,
+        throttle_report: &OsccThrottleReport,
+    ) -> Result<(), CanError> {
+        {
+            self.throttle_report_can_frame
+                .set_data_length(OSCC_THROTTLE_REPORT_CAN_DLC as _);
+
+            let data = self.throttle_report_can_frame.data_as_mut();
+
+            data[0] = OSCC_MAGIC_BYTE_0;
+            data[1] = OSCC_MAGIC_BYTE_1;
+            data[2] = throttle_report.enabled as _;
+            data[3] = throttle_report.operator_override as _;
+            data[4] = throttle_report.dtcs;
+        }
+
+        self.control_can
+            .transmit(&self.throttle_report_can_frame.into())
+    }
+}
+
+impl SteeringReportPublisher for CanGatewayModule {
+    fn publish_steering_report(
+        &mut self,
+        steering_report: &OsccSteeringReport,
+    ) -> Result<(), CanError> {
+        {
+            self.steering_report_can_frame
+                .set_data_length(OSCC_STEERING_REPORT_CAN_DLC as _);
+
+            let data = self.steering_report_can_frame.data_as_mut();
+
+            data[0] = OSCC_MAGIC_BYTE_0;
+            data[1] = OSCC_MAGIC_BYTE_1;
+            data[2] = steering_report.enabled as _;
+            data[3] = steering_report.operator_override as _;
+            data[4] = steering_report.dtcs;
+        }
+
+        self.control_can
+            .transmit(&self.steering_report_can_frame.into())
     }
 }
