@@ -158,10 +158,9 @@ fn main() -> ! {
                 }
                 // TODO - CAN receive error handling
                 // includes BufferExhausted, which means no data available
-                Err(_) => {}
-                /*Err(e) => writeln!(debug_console, "CAN receive failure: {:?}", e)
-                 *    .expect(DEBUG_WRITE_FAILURE), // TODO - CAN receive error
-                 * handling */
+                Err(_) => {} /*Err(e) => writeln!(debug_console, "CAN receive failure: {:?}", e)
+                              *    .expect(DEBUG_WRITE_FAILURE), // TODO - CAN receive error
+                              * handling */
             }
         }
 
