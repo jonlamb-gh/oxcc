@@ -1,5 +1,12 @@
 #![allow(dead_code)]
 
+use ranges;
+use typenum::consts::*;
+type U1638 = op!{U1000 + U638};
+type U1875 = op!{U1000 + U875};
+type U3358 = op!{U1000 + U1000 + U1000 + U358};
+type U3440 = op!{U1000 + U1000 + U1000 + U440};
+
 /// Kia Soul EV
 
 // ********************************************************************
@@ -122,6 +129,8 @@ pub const BRAKE_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 273;
 //
 pub const BRAKE_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 917;
 
+pub type BrakeSpoofLowSignal = ranges::Bounded<u16, U273, U917>;
+
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
@@ -135,6 +144,9 @@ pub const BRAKE_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 572;
 // Equal to \ref BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
 //
 pub const BRAKE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 1875;
+
+pub type BrakeSpoofHighSignal = ranges::Bounded<u16, U572, U1875>;
+
 
 /*
  * @brief Calculation to convert a brake position to a low spoof voltage. */
@@ -229,6 +241,8 @@ pub const STEERING_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 656;
 //
 pub const STEERING_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 3358;
 
+pub type SteeringSpoofLowSignal = ranges::Bounded<u16, U656, U3358>;
+
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
@@ -242,6 +256,8 @@ pub const STEERING_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 738;
 // Equal to \ref STEERING_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
 //
 pub const STEERING_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 3440;
+
+pub type SteeringSpoofHighSignal = ranges::Bounded<u16, U738, U3440>;
 
 /*
  * @brief Scalar value for the low spoof signal taken from a calibration
@@ -350,6 +366,8 @@ pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 245;
 //
 pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 1638;
 
+pub type ThrottleSpoofLowSignal = ranges::Bounded<u16, U245, U1638>;
+
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
@@ -364,6 +382,7 @@ pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 573;
 //
 pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 3358;
 
+pub type ThrottleSpoofHighSignal = ranges::Bounded<u16, U573, U3358>;
 /*
  * @brief Calculation to convert a throttle position to a low spoof voltage. */
 //
