@@ -1,7 +1,6 @@
 // https://github.com/jonlamb-gh/oscc/tree/devel/firmware/throttle
 
 use board::AcceleratorPositionSensor;
-use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
@@ -16,8 +15,6 @@ use oscc_magic_byte::*;
 use throttle_can_protocol::*;
 use types::*;
 use vehicle::*;
-
-// TODO - use some form of println! logging that prefixes with a module name?
 
 struct ThrottleControlState<DTCS: DtcBitfield> {
     enabled: bool,
@@ -141,7 +138,8 @@ impl ThrottleModule {
     ) -> Option<&OsccFaultReport> {
         if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
             // Assumes this module already went through the proper transition into a faulted
-            // and disabled state, and we do not want to double-report a possible duplicate fault.
+            // and disabled state, and we do not want to double-report a possible duplicate
+            // fault.
             return None;
         }
 
@@ -170,18 +168,14 @@ impl ThrottleModule {
                 .set(OSCC_THROTTLE_DTC_INVALID_SENSOR_VAL);
 
             self.update_fault_report();
+
             writeln!(
                 debug_console,
                 "Bad value read from accelerator position sensor"
             );
+
             Some(&self.fault_report)
         } else if operator_overridden && !self.control_state.operator_override {
-            // TODO - oxcc change, don't continously disable when override is already
-            // handled oscc throttle module doesn't allow for continious
-            // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
-            // but brake and steering do?
-            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
-            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
             self.disable_control(debug_console);
 
             self.control_state
@@ -189,8 +183,11 @@ impl ThrottleModule {
                 .set(OSCC_THROTTLE_DTC_OPERATOR_OVERRIDE);
 
             self.update_fault_report();
+
             self.control_state.operator_override = true;
+
             writeln!(debug_console, "Throttle operator override");
+
             Some(&self.fault_report)
         } else {
             self.control_state.dtcs.clear_all();
@@ -199,17 +196,15 @@ impl ThrottleModule {
         }
     }
 
-    pub fn publish_throttle_report(&mut self, can_gateway: &mut CanGatewayModule) {
+    fn update_fault_report(&mut self) {
+        self.fault_report.dtcs = self.control_state.dtcs;
+    }
+
+    pub fn supply_throttle_report(&mut self) -> &OsccThrottleReport {
         self.throttle_report.enabled = self.control_state.enabled;
         self.throttle_report.operator_override = self.control_state.operator_override;
         self.throttle_report.dtcs = self.control_state.dtcs;
-
-        self.throttle_report
-            .transmit(&mut can_gateway.control_can());
-    }
-
-    fn update_fault_report(&mut self) {
-        self.fault_report.dtcs = self.control_state.dtcs;
+        &self.throttle_report
     }
 
     // TODO - error handling
