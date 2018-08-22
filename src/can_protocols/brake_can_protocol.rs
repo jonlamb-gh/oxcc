@@ -26,7 +26,7 @@ impl<'a> From<&'a DataFrame> for OsccBrakeCommand {
             | (u32::from(data[5]) << 24);
 
         OsccBrakeCommand {
-            pedal_command: raw_brake_request as f32,
+            pedal_command: f32::from_bits(raw_brake_request),
         }
     }
 }

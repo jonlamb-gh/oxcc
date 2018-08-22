@@ -26,7 +26,7 @@ impl<'a> From<&'a DataFrame> for OsccThrottleCommand {
             | (u32::from(data[5]) << 24);
 
         OsccThrottleCommand {
-            torque_request: raw_torque_request as f32,
+            torque_request: f32::from_bits(raw_torque_request),
         }
     }
 }

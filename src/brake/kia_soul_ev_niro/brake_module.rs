@@ -16,8 +16,6 @@ use num;
 use oscc_magic_byte::*;
 use vehicle::*;
 
-// TODO - use some form of println! logging that prefixes with a module name?
-
 struct BrakeControlState<DTCS: DtcBitfield> {
     enabled: bool,
     operator_override: bool,
@@ -187,12 +185,6 @@ impl BrakeModule {
 
             Some(&self.fault_report)
         } else if operator_overridden && !self.control_state.operator_override {
-            // TODO - oxcc change, don't continously disable when override is already
-            // handled oscc throttle module doesn't allow for continious
-            // override-disables: https://github.com/jonlamb-gh/oscc/blob/master/firmware/throttle/src/throttle_control.cpp#L64
-            // but brake and steering do?
-            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/brake/kia_soul_ev_niro/src/brake_control.cpp#L65
-            // https://github.com/jonlamb-gh/oscc/blob/master/firmware/steering/src/steering_control.cpp#L84
             self.disable_control(debug_console);
 
             self.control_state
