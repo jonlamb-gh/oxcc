@@ -120,8 +120,8 @@ impl BrakeModule {
             let spoof_high = BrakeSpoofHighSignal::clamp(spoof_command_high);
             let spoof_low = BrakeSpoofLowSignal::clamp(spoof_command_low);
 
-            if (spoof_high.val > BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
-                || (spoof_low.val > BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
+            if (spoof_high.val() > &BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
+                || (spoof_low.val() > &BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
             {
                 self.brake_pins.brake_light_enable.set_high();
             } else {
