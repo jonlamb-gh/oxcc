@@ -1,5 +1,8 @@
-use board::DAC_SAMPLE_AVERAGE_COUNT;
+use board::{DacSampleAverageCount, DAC_SAMPLE_AVERAGE_COUNT};
+use dac_mcp4922::DacOutput;
 use num;
+use ranges::{self, BoundedSummation};
+use typenum::consts::*;
 
 pub struct DualSignal<T: HighLowReader> {
     high: u16,
@@ -28,19 +31,16 @@ where
     // single read with large Cycles480 sample time?
     // https://github.com/jonlamb-gh/oscc/blob/devel/firmware/common/libs/dac/oscc_dac.cpp#L17
     pub fn prevent_signal_discontinuity(&mut self) {
-        let mut low: u32 = 0;
-        let mut high: u32 = 0;
+        let low_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| {
+            DacOutput::clamp(self.reader.read_low())
+        });
 
-        for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            low += u32::from(self.reader.read_low());
-        }
+        let high_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| {
+            DacOutput::clamp(self.reader.read_high())
+        });
 
-        for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            high += u32::from(self.reader.read_high());
-        }
-
-        self.low = (low / DAC_SAMPLE_AVERAGE_COUNT) as _;
-        self.high = (high / DAC_SAMPLE_AVERAGE_COUNT) as _;
+        self.low = (low_sum.val() / DAC_SAMPLE_AVERAGE_COUNT) as _;
+        self.high = (high_sum.val() / DAC_SAMPLE_AVERAGE_COUNT) as _;
     }
 
     pub fn average(&self) -> u16 {

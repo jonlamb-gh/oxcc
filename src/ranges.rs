@@ -1,4 +1,6 @@
 use core::marker::PhantomData;
+
+use core::ops::{AddAssign, Mul, Sub};
 use num;
 use typenum::{Cmp, Same, Unsigned, B1};
 
@@ -24,6 +26,18 @@ impl<T: Unsigned> ReifyTo<u16> for T {
     }
 }
 
+impl<T: Unsigned> ReifyTo<u32> for T {
+    fn reify() -> u32 {
+        <T as Unsigned>::to_u32()
+    }
+}
+
+impl<T: Unsigned> ReifyTo<usize> for T {
+    fn reify() -> usize {
+        <T as Unsigned>::to_usize()
+    }
+}
+
 #[derive(Debug)]
 pub struct Bounded<T, L, U> {
     val: T,
@@ -42,6 +56,10 @@ impl<T: PartialOrd, L: ReifyTo<T>, U: ReifyTo<T>> Bounded<T, L, U> {
 
     pub fn val(&self) -> &T {
         &self.val
+    }
+
+    pub fn move_val(self) -> T {
+        self.val
     }
 }
 
@@ -79,5 +97,45 @@ where
         val: b.val,
         _lower_inclusive: PhantomData,
         _upper_inclusive: PhantomData,
+    }
+}
+
+pub struct Summation<TSum, SumL: ReifyTo<usize>, SumU: ReifyTo<usize>> {
+    _sum: PhantomData<TSum>,
+    _sum_lower: PhantomData<SumL>,
+    _sum_upper: PhantomData<SumU>,
+}
+
+pub trait BoundedSummation<F, FOutT, FOutL, FOutU>
+where
+    F: Fn(usize) -> Bounded<FOutT, FOutL, FOutU>,
+{
+    type Output;
+    fn eval(f: F) -> Self::Output;
+}
+
+impl<TSum, SumL, SumU, F, FOutT, FOutL, FOutU> BoundedSummation<F, FOutT, FOutL, FOutU> for Summation<TSum, SumL, SumU>
+where
+    TSum: Default + AddAssign + From<FOutT>,
+    SumL: ReifyTo<usize>,
+    SumU: ReifyTo<usize> + Sub<SumL>,
+    F: Fn(usize) -> Bounded<FOutT, FOutL, FOutU>,
+    FOutT: PartialOrd,
+    FOutL: ReifyTo<FOutT> + Mul<op!{SumU - SumL}>,
+    FOutU: ReifyTo<FOutT> + Mul<op!{SumU - SumL}>,
+{
+    type Output = Bounded<TSum, op!{FOutL * (SumU - SumL)}, op!{FOutU * (SumU - SumL)}>;
+
+    fn eval(f: F) -> Self::Output {
+        let mut sum: TSum = TSum::default();
+        for index in SumL::reify()..SumU::reify() {
+            sum += f(index).move_val().into();
+        }
+
+        Bounded {
+            val: sum,
+            _lower_inclusive: PhantomData,
+            _upper_inclusive: PhantomData,
+        }
     }
 }
