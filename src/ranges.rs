@@ -26,7 +26,7 @@ impl<T: Unsigned> ReifyTo<u16> for T {
 
 #[derive(Debug)]
 pub struct Bounded<T,L,U> {
-    pub val: T,
+    val: T,
     _lower_inclusive: PhantomData<L>,
     _upper_inclusive: PhantomData<U>,
 }
@@ -38,6 +38,10 @@ impl<T: PartialOrd, L: ReifyTo<T>, U: ReifyTo<T>> Bounded<T,L,U> {
             _lower_inclusive: PhantomData,
             _upper_inclusive: PhantomData
         }
+    }
+
+    pub fn val(&self) -> &T {
+        &self.val
     }
 }
 

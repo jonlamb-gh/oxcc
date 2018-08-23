@@ -55,8 +55,8 @@ where
 
         let mut buffer = [0u8; 2];
         // bits 11 through 0: data
-        buffer[0] = (data.val & 0x00FF) as _;
-        buffer[1] = ((data.val >> 8) & 0x000F) as u8
+        buffer[0] = (data.val() & 0x00FF) as _;
+        buffer[1] = ((data.val() >> 8) & (0x000F as u16)) as u8
             // bit 12: shutdown bit. 1 for active operation
             | (1 << 4)
             // bit 13: gain bit; 0 for 1x gain, 1 for 2x
