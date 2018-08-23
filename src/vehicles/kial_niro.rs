@@ -1,5 +1,12 @@
 #![allow(dead_code)]
 
+use ranges;
+use typenum::consts::*;
+type U1723 = op!{U1000 + U723};
+type U3358 = op!{U1000 + U1000 + U1000 + U358};
+type U3440 = op!{U1000 + U1000 + U1000 + U440};
+type U3446 = op!{U1000 + U1000 + U1000 + U446};
+
 /// Kia Niro
 
 // ********************************************************************
@@ -229,6 +236,8 @@ pub const STEERING_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 656;
 //
 pub const STEERING_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 3358;
 
+pub type SteeringSpoofLowSignal = ranges::Bounded<u16, U656, U3358>;
+
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
@@ -242,6 +251,8 @@ pub const STEERING_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 738;
 // Equal to \ref STEERING_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
 //
 pub const STEERING_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 3440;
+
+pub type SteeringSpoofHighSignal = ranges::Bounded<u16, U738, U3440>;
 
 /*
  * @brief Scalar value for the low spoof signal taken from a calibration
@@ -350,6 +361,8 @@ pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MIN: u16 = 311;
 //
 pub const THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MAX: u16 = 1723;
 
+pub type ThrottleSpoofLowSignal = ranges::Bounded<u16, U311, U1723>;
+
 /*
  * @brief Minimum allowed value for the low spoof signal value. [steps] */
 //
@@ -363,6 +376,9 @@ pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MIN: u16 = 620;
 // Equal to \ref THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MAX * \ref STEPS_PER_VOLT.
 //
 pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 3446;
+
+pub type ThrottleSpoofHighSignal = ranges::Bounded<u16, U620, U3446>;
+
 
 /*
  * @brief Calculation to convert a throttle position to a low spoof voltage. */

@@ -7,6 +7,14 @@ use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 
+use ranges::Bounded;
+use typenum::{U0, U1, U4096};
+
+type U4095 = op! { U4096 - U1 };
+
+/// It's a 12 bit dac, so the upper bound is 4095 (2^12 - 1)
+pub type DacOutput = Bounded<u16, U0, U4095>;
+
 /// SPI mode
 pub const MODE: Mode = Mode {
     phase: Phase::CaptureOnFirstTransition,
@@ -36,19 +44,19 @@ where
         Mcp4922 { spi, cs }
     }
 
-    pub fn output_ab(&mut self, output_a: u16, output_b: u16) {
+    pub fn output_ab(&mut self, output_a: DacOutput, output_b: DacOutput) {
         // TODO latching?
         self.output(output_a, Channel::ChannelA);
         self.output(output_b, Channel::ChannelB);
     }
 
-    pub fn output(&mut self, data: u16, channel: Channel) {
+    pub fn output(&mut self, data: DacOutput, channel: Channel) {
         self.cs.set_low();
 
         let mut buffer = [0u8; 2];
         // bits 11 through 0: data
-        buffer[0] = (data & 0x00FF) as _;
-        buffer[1] = ((data >> 8) & 0x000F) as u8
+        buffer[0] = (data.val() & 0x00FF) as _;
+        buffer[1] = ((data.val() >> 8) & (0x000F as u16)) as u8
             // bit 12: shutdown bit. 1 for active operation
             | (1 << 4)
             // bit 13: gain bit; 0 for 1x gain, 1 for 2x

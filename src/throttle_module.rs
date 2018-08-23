@@ -2,6 +2,7 @@
 
 use board::AcceleratorPositionSensor;
 use core::fmt::Write;
+use dac_mcp4922::DacOutput;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
@@ -12,6 +13,7 @@ use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
+use ranges;
 use throttle_can_protocol::*;
 use types::*;
 use vehicle::*;
@@ -86,8 +88,8 @@ impl ThrottleModule {
             self.accelerator_position.prevent_signal_discontinuity();
 
             self.throttle_dac.output_ab(
-                self.accelerator_position.low(),
-                self.accelerator_position.high(),
+                DacOutput::clamp(self.accelerator_position.low()),
+                DacOutput::clamp(self.accelerator_position.high()),
             );
 
             self.throttle_pins.spoof_enable.set_low();
@@ -101,8 +103,8 @@ impl ThrottleModule {
             self.accelerator_position.prevent_signal_discontinuity();
 
             self.throttle_dac.output_ab(
-                self.accelerator_position.low(),
-                self.accelerator_position.high(),
+                DacOutput::clamp(self.accelerator_position.low()),
+                DacOutput::clamp(self.accelerator_position.high()),
             );
 
             self.throttle_pins.spoof_enable.set_high();
@@ -113,20 +115,11 @@ impl ThrottleModule {
 
     fn update_throttle(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
-            let spoof_high = num::clamp(
-                spoof_command_high,
-                THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MIN,
-                THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MAX,
-            );
-
-            let spoof_low = num::clamp(
-                spoof_command_low,
-                THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MIN,
-                THROTTLE_SPOOF_LOW_SIGNAL_RANGE_MAX,
-            );
-
             // TODO - revisit this, enforce high->A, low->B
-            self.throttle_dac.output_ab(spoof_high, spoof_low);
+            self.throttle_dac.output_ab(
+                ranges::coerce(ThrottleSpoofHighSignal::clamp(spoof_command_high)),
+                ranges::coerce(ThrottleSpoofHighSignal::clamp(spoof_command_low)),
+            );
         }
     }
 

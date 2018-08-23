@@ -2,6 +2,7 @@
 
 use board::TorqueSensor;
 use core::fmt::Write;
+use dac_mcp4922::DacOutput;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
@@ -12,6 +13,7 @@ use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
+use ranges;
 use steering_can_protocol::*;
 use types::*;
 use vehicle::*;
@@ -87,8 +89,10 @@ impl SteeringModule {
         if self.control_state.enabled {
             self.steering_torque.prevent_signal_discontinuity();
 
-            self.steering_dac
-                .output_ab(self.steering_torque.low(), self.steering_torque.high());
+            self.steering_dac.output_ab(
+                DacOutput::clamp(self.steering_torque.low()),
+                DacOutput::clamp(self.steering_torque.high()),
+            );
 
             self.steering_pins.spoof_enable.set_low();
             self.control_state.enabled = false;
@@ -100,8 +104,10 @@ impl SteeringModule {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.steering_torque.prevent_signal_discontinuity();
 
-            self.steering_dac
-                .output_ab(self.steering_torque.low(), self.steering_torque.high());
+            self.steering_dac.output_ab(
+                DacOutput::clamp(self.steering_torque.low()),
+                DacOutput::clamp(self.steering_torque.high()),
+            );
 
             self.steering_pins.spoof_enable.set_high();
             self.control_state.enabled = true;
@@ -111,20 +117,11 @@ impl SteeringModule {
 
     pub fn update_steering(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
-            let spoof_high = num::clamp(
-                spoof_command_high,
-                STEERING_SPOOF_HIGH_SIGNAL_RANGE_MIN,
-                STEERING_SPOOF_HIGH_SIGNAL_RANGE_MAX,
-            );
-
-            let spoof_low = num::clamp(
-                spoof_command_low,
-                STEERING_SPOOF_LOW_SIGNAL_RANGE_MIN,
-                STEERING_SPOOF_LOW_SIGNAL_RANGE_MAX,
-            );
-
             // TODO - revisit this, enforce high->A, low->B
-            self.steering_dac.output_ab(spoof_high, spoof_low);
+            self.steering_dac.output_ab(
+                ranges::coerce(SteeringSpoofHighSignal::clamp(spoof_command_high)),
+                ranges::coerce(SteeringSpoofLowSignal::clamp(spoof_command_low)),
+            );
         }
     }
 
