@@ -43,8 +43,8 @@ where
         self.high = (high / DAC_SAMPLE_AVERAGE_COUNT) as _;
     }
 
-    pub fn average(&self) -> u32 {
-        (u32::from(self.low) + u32::from(self.high)) / 2
+    pub fn average(&self) -> u16 {
+        ((u32::from(self.low) + u32::from(self.high)) / 2) as u16
     }
 
     pub fn diff(&self) -> u16 {

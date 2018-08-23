@@ -464,4 +464,4 @@ pub const fn throttle_position_to_volts_high(position: f32) -> f32 {
  * override. [steps] */
 //
 //
-pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185 << 2;
+pub const ACCELERATOR_OVERRIDE_THRESHOLD: u16 = 185 << 2;
