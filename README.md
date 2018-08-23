@@ -6,7 +6,7 @@
 rustup default nightly
 
 rustup component add rust-src
-rustup component add rustfmt-preview
+cargo install --force rustfmt-nightly
 
 rustup target add thumbv7em-none-eabihf
 
@@ -14,7 +14,9 @@ cargo install svd2rust
 
 # currently used for linking
 # TODO - switch over to lld
-sudo apt-get install gcc-arm-none-eabi
+sudo add-apt-repository ppa:team-gcc-arm-embedded/ppa
+sudo apt update
+sudo apt install gcc-arm-embedded
 ```
 
 ```bash
