@@ -4,6 +4,7 @@ use super::types::*;
 use board::BrakePedalPositionSensor;
 use brake_can_protocol::*;
 use core::fmt::Write;
+use dac_mcp4922::DacOutput;
 use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
@@ -14,6 +15,7 @@ use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
+use ranges;
 use vehicle::*;
 
 struct BrakeControlState<DTCS: DtcBitfield> {
@@ -87,8 +89,8 @@ impl BrakeModule {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
             self.brake_dac.output_ab(
-                self.brake_pedal_position.low(),
-                self.brake_pedal_position.high(),
+                DacOutput::clamp(self.brake_pedal_position.low()),
+                DacOutput::clamp(self.brake_pedal_position.high()),
             );
 
             self.brake_pins.spoof_enable.set_low();
@@ -103,8 +105,8 @@ impl BrakeModule {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
             self.brake_dac.output_ab(
-                self.brake_pedal_position.low(),
-                self.brake_pedal_position.high(),
+                DacOutput::clamp(self.brake_pedal_position.low()),
+                DacOutput::clamp(self.brake_pedal_position.high()),
             );
 
             self.brake_pins.spoof_enable.set_high();
@@ -115,20 +117,11 @@ impl BrakeModule {
 
     fn update_brake(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
         if self.control_state.enabled {
-            let spoof_high = num::clamp(
-                spoof_command_high,
-                BRAKE_SPOOF_HIGH_SIGNAL_RANGE_MIN,
-                BRAKE_SPOOF_HIGH_SIGNAL_RANGE_MAX,
-            );
+            let spoof_high = BrakeSpoofHighSignal::clamp(spoof_command_high);
+            let spoof_low = BrakeSpoofLowSignal::clamp(spoof_command_low);
 
-            let spoof_low = num::clamp(
-                spoof_command_low,
-                BRAKE_SPOOF_LOW_SIGNAL_RANGE_MIN,
-                BRAKE_SPOOF_LOW_SIGNAL_RANGE_MAX,
-            );
-
-            if (spoof_high > BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
-                || (spoof_low > BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
+            if (spoof_high.val() > &BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
+                || (spoof_low.val() > &BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
             {
                 self.brake_pins.brake_light_enable.set_high();
             } else {
@@ -136,7 +129,8 @@ impl BrakeModule {
             }
 
             // TODO - revisit this, enforce high->A, low->B
-            self.brake_dac.output_ab(spoof_high, spoof_low);
+            self.brake_dac
+                .output_ab(ranges::coerce(spoof_high), ranges::coerce(spoof_low));
         }
     }
 

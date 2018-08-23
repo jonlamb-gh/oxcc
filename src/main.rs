@@ -14,6 +14,8 @@ extern crate num;
 extern crate panic_abort;
 #[cfg(feature = "panic-over-semihosting")]
 extern crate panic_semihosting;
+#[macro_use]
+extern crate typenum;
 
 mod board;
 mod can_gateway_module;
@@ -26,6 +28,7 @@ mod ms_timer;
 mod steering_module;
 mod throttle_module;
 mod types;
+mod ranges;
 
 #[path = "can_protocols/brake_can_protocol.rs"]
 mod brake_can_protocol;
