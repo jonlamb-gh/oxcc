@@ -16,6 +16,7 @@ use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
+use typenum::consts::*;
 
 pub use types::*;
 
@@ -45,6 +46,7 @@ pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
 // not sure if the averaging is needed, we might be able to just use a
 // single read with large Cycles480 sample time?
 pub const DAC_SAMPLE_AVERAGE_COUNT: u32 = 20;
+pub type DacSampleAverageCount = U20;
 
 pub struct FullBoard {
     pub debug_console: DebugConsole,
