@@ -1,7 +1,7 @@
 use board::{DacSampleAverageCount, DAC_SAMPLE_AVERAGE_COUNT};
 use dac_mcp4922::DacOutput;
 use num;
-use ranges::{self, BoundedSummation};
+use ranges::{self, BoundedSummation, BoundedConstDiv};
 use typenum::consts::*;
 
 pub struct DualSignal<T: HighLowReader> {
@@ -39,8 +39,11 @@ where
             DacOutput::clamp(self.reader.read_high())
         });
 
-        self.low = (low_sum.val() / DAC_SAMPLE_AVERAGE_COUNT) as _;
-        self.high = (high_sum.val() / DAC_SAMPLE_AVERAGE_COUNT) as _;
+        let new_low: DacOutput = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(low_sum)));
+        let new_high: DacOutput = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(high_sum)));
+
+        self.low = new_low.move_val();
+        self.high = new_high.move_val();
     }
 
     pub fn average(&self) -> u16 {
