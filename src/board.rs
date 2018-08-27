@@ -2,7 +2,7 @@ use config;
 use cortex_m;
 use dac_mcp4922::Mcp4922;
 use dac_mcp4922::MODE as DAC_MODE;
-use dual_signal::HighLowReader;
+use dual_signal::{AdcInput, HighLowReader};
 use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcPrescaler, AdcSampleTime};
@@ -45,7 +45,6 @@ pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
 
 // not sure if the averaging is needed, we might be able to just use a
 // single read with large Cycles480 sample time?
-pub const DAC_SAMPLE_AVERAGE_COUNT: u32 = 20;
 pub type DacSampleAverageCount = U20;
 
 pub struct FullBoard {
@@ -390,11 +389,11 @@ pub struct BrakePedalPositionSensor {
 }
 
 impl HighLowReader for BrakePedalPositionSensor {
-    fn read_high(&self) -> u16 {
-        self.adc1.read(AdcChannel::Adc123In3, ADC_SAMPLE_TIME)
+    fn read_high(&self) -> AdcInput {
+        AdcInput::clamp(self.adc1.read(AdcChannel::Adc123In3, ADC_SAMPLE_TIME))
     }
-    fn read_low(&self) -> u16 {
-        self.adc1.read(AdcChannel::Adc123In10, ADC_SAMPLE_TIME)
+    fn read_low(&self) -> AdcInput {
+        AdcInput::clamp(self.adc1.read(AdcChannel::Adc123In10, ADC_SAMPLE_TIME))
     }
 }
 
@@ -404,11 +403,11 @@ pub struct AcceleratorPositionSensor {
 }
 
 impl HighLowReader for AcceleratorPositionSensor {
-    fn read_high(&self) -> u16 {
-        self.adc2.read(AdcChannel::Adc123In13, ADC_SAMPLE_TIME)
+    fn read_high(&self) -> AdcInput {
+        AdcInput::clamp(self.adc2.read(AdcChannel::Adc123In13, ADC_SAMPLE_TIME))
     }
-    fn read_low(&self) -> u16 {
-        self.adc2.read(AdcChannel::Adc12In9, ADC_SAMPLE_TIME)
+    fn read_low(&self) -> AdcInput {
+        AdcInput::clamp(self.adc2.read(AdcChannel::Adc12In9, ADC_SAMPLE_TIME))
     }
 }
 
@@ -418,11 +417,11 @@ pub struct TorqueSensor {
 }
 
 impl HighLowReader for TorqueSensor {
-    fn read_high(&self) -> u16 {
-        self.adc3.read(AdcChannel::Adc3In15, ADC_SAMPLE_TIME)
+    fn read_high(&self) -> AdcInput {
+        AdcInput::clamp(self.adc3.read(AdcChannel::Adc3In15, ADC_SAMPLE_TIME))
     }
-    fn read_low(&self) -> u16 {
-        self.adc3.read(AdcChannel::Adc3In8, ADC_SAMPLE_TIME)
+    fn read_low(&self) -> AdcInput {
+        AdcInput::clamp(self.adc3.read(AdcChannel::Adc3In8, ADC_SAMPLE_TIME))
     }
 }
 

@@ -2,9 +2,8 @@
 
 use board::TorqueSensor;
 use core::fmt::Write;
-use dac_mcp4922::DacOutput;
 use dtc::DtcBitfield;
-use dual_signal::DualSignal;
+use dual_signal::{AdcInput, DualSignal};
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
 use ms_timer::MsTimer;
@@ -62,7 +61,7 @@ impl UnpreparedSteeringModule {
     ) -> Self {
         UnpreparedSteeringModule {
             steering_module: SteeringModule {
-                steering_torque: DualSignal::new(0, 0, torque_sensor),
+                steering_torque: DualSignal::new(AdcInput::clamp(0), AdcInput::clamp(0), torque_sensor),
                 control_state: SteeringControlState::new(u8::default()),
                 grounded_fault_state: FaultCondition::new(),
                 filtered_diff: 0,
@@ -90,8 +89,8 @@ impl SteeringModule {
             self.steering_torque.prevent_signal_discontinuity();
 
             self.steering_dac.output_ab(
-                DacOutput::clamp(self.steering_torque.low()),
-                DacOutput::clamp(self.steering_torque.high()),
+                self.steering_torque.low(),
+                self.steering_torque.high()
             );
 
             self.steering_pins.spoof_enable.set_low();
@@ -105,8 +104,8 @@ impl SteeringModule {
             self.steering_torque.prevent_signal_discontinuity();
 
             self.steering_dac.output_ab(
-                DacOutput::clamp(self.steering_torque.low()),
-                DacOutput::clamp(self.steering_torque.high()),
+                self.steering_torque.low(),
+                self.steering_torque.high()
             );
 
             self.steering_pins.spoof_enable.set_high();
