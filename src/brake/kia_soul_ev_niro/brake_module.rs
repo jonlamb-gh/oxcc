@@ -4,9 +4,8 @@ use super::types::*;
 use board::BrakePedalPositionSensor;
 use brake_can_protocol::*;
 use core::fmt::Write;
-use dac_mcp4922::DacOutput;
 use dtc::DtcBitfield;
-use dual_signal::DualSignal;
+use dual_signal::{AdcInput, DualSignal};
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
 use ms_timer::MsTimer;
@@ -60,7 +59,7 @@ impl UnpreparedBrakeModule {
     ) -> Self {
         UnpreparedBrakeModule {
             brake_module: BrakeModule {
-                brake_pedal_position: DualSignal::new(0, 0, brake_pedal_position_sensor),
+                brake_pedal_position: DualSignal::new(AdcInput::clamp(0), AdcInput::clamp(0), brake_pedal_position_sensor),
                 control_state: BrakeControlState::new(u8::default()),
                 grounded_fault_state: FaultCondition::new(),
                 operator_override_state: FaultCondition::new(),
@@ -89,8 +88,8 @@ impl BrakeModule {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
             self.brake_dac.output_ab(
-                DacOutput::clamp(self.brake_pedal_position.low()),
-                DacOutput::clamp(self.brake_pedal_position.high()),
+                self.brake_pedal_position.low(),
+                self.brake_pedal_position.high()
             );
 
             self.brake_pins.spoof_enable.set_low();
@@ -105,8 +104,8 @@ impl BrakeModule {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
             self.brake_dac.output_ab(
-                DacOutput::clamp(self.brake_pedal_position.low()),
-                DacOutput::clamp(self.brake_pedal_position.high()),
+                self.brake_pedal_position.low(),
+                self.brake_pedal_position.high()
             );
 
             self.brake_pins.spoof_enable.set_high();
@@ -120,8 +119,8 @@ impl BrakeModule {
             let spoof_high = BrakeSpoofHighSignal::clamp(spoof_command_high);
             let spoof_low = BrakeSpoofLowSignal::clamp(spoof_command_low);
 
-            if (spoof_high.val() > &BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
-                || (spoof_low.val() > &BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
+            if (spoof_high.val() > BRAKE_LIGHT_SPOOF_HIGH_THRESHOLD)
+                || (spoof_low.val() > BRAKE_LIGHT_SPOOF_LOW_THRESHOLD)
             {
                 self.brake_pins.brake_light_enable.set_high();
             } else {
@@ -151,7 +150,7 @@ impl BrakeModule {
         let brake_pedal_position_average = self.brake_pedal_position.average();
 
         let operator_overridden: bool = self.operator_override_state.condition_exceeded_duration(
-            brake_pedal_position_average >= BRAKE_PEDAL_OVERRIDE_THRESHOLD.into(),
+            brake_pedal_position_average.val() >= BRAKE_PEDAL_OVERRIDE_THRESHOLD.into(),
             FAULT_HYSTERESIS,
             timer_ms,
         );

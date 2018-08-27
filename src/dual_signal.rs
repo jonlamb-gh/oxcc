@@ -1,9 +1,14 @@
-use board::DAC_SAMPLE_AVERAGE_COUNT;
+use board::DacSampleAverageCount;
 use num;
+use ranges::{self, Bounded, BoundedSummation, BoundedConstDiv};
+use typenum::consts::*;
+
+type U4095 = op! { U4096 - U1 };
+pub type AdcInput = Bounded<u16, U0, U4095>;
 
 pub struct DualSignal<T: HighLowReader> {
-    high: u16,
-    low: u16,
+    high: AdcInput,
+    low: AdcInput,
     reader: T,
 }
 
@@ -11,7 +16,7 @@ impl<T> DualSignal<T>
 where
     T: HighLowReader,
 {
-    pub fn new(high: u16, low: u16, high_low_reader: T) -> Self {
+    pub fn new(high: AdcInput, low: AdcInput, high_low_reader: T) -> Self {
         DualSignal {
             high,
             low,
@@ -28,39 +33,35 @@ where
     // single read with large Cycles480 sample time?
     // https://github.com/jonlamb-gh/oscc/blob/devel/firmware/common/libs/dac/oscc_dac.cpp#L17
     pub fn prevent_signal_discontinuity(&mut self) {
-        let mut low: u32 = 0;
-        let mut high: u32 = 0;
+        let low_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| self.reader.read_low());
+        let high_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| self.reader.read_high());
 
-        for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            low += u32::from(self.reader.read_low());
-        }
-
-        for _ in 0..DAC_SAMPLE_AVERAGE_COUNT {
-            high += u32::from(self.reader.read_high());
-        }
-
-        self.low = (low / DAC_SAMPLE_AVERAGE_COUNT) as _;
-        self.high = (high / DAC_SAMPLE_AVERAGE_COUNT) as _;
+        self.low = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(low_sum)));
+        self.high = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(high_sum)));
     }
 
-    pub fn average(&self) -> u32 {
-        (u32::from(self.low) + u32::from(self.high)) / 2
+    pub fn average(&self) -> AdcInput {
+        let low: u16 = self.low.val();
+        let high: u16 = self.high.val();
+        AdcInput::clamp(((u32::from(high) + u32::from(low)) / 2) as u16)
     }
 
     pub fn diff(&self) -> u16 {
-        num::abs(i32::from(self.high) - i32::from(self.low)) as u16
+        let low: u16 = self.low.val();
+        let high: u16 = self.high.val();
+        num::abs(i32::from(high) - i32::from(low)) as u16
     }
 
-    pub fn high(&self) -> u16 {
+    pub fn high(&self) -> AdcInput {
         self.high
     }
 
-    pub fn low(&self) -> u16 {
+    pub fn low(&self) -> AdcInput {
         self.low
     }
 }
 
 pub trait HighLowReader {
-    fn read_high(&self) -> u16;
-    fn read_low(&self) -> u16;
+    fn read_high(&self) -> AdcInput;
+    fn read_low(&self) -> AdcInput;
 }
