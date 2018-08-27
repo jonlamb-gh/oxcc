@@ -2,9 +2,8 @@
 
 use board::AcceleratorPositionSensor;
 use core::fmt::Write;
-use dac_mcp4922::DacOutput;
 use dtc::DtcBitfield;
-use dual_signal::DualSignal;
+use dual_signal::{AdcInput, DualSignal};
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
 use ms_timer::MsTimer;
@@ -60,7 +59,7 @@ impl UnpreparedThrottleModule {
     ) -> UnpreparedThrottleModule {
         UnpreparedThrottleModule {
             throttle_module: ThrottleModule {
-                accelerator_position: DualSignal::new(0, 0, accelerator_position_sensor),
+                accelerator_position: DualSignal::new(AdcInput::clamp(0), AdcInput::clamp(0), accelerator_position_sensor),
                 control_state: ThrottleControlState::new(u8::default()),
                 grounded_fault_state: FaultCondition::new(),
                 operator_override_state: FaultCondition::new(),
@@ -88,8 +87,8 @@ impl ThrottleModule {
             self.accelerator_position.prevent_signal_discontinuity();
 
             self.throttle_dac.output_ab(
-                DacOutput::clamp(self.accelerator_position.low()),
-                DacOutput::clamp(self.accelerator_position.high()),
+                self.accelerator_position.low(),
+                self.accelerator_position.high()
             );
 
             self.throttle_pins.spoof_enable.set_low();
@@ -103,8 +102,8 @@ impl ThrottleModule {
             self.accelerator_position.prevent_signal_discontinuity();
 
             self.throttle_dac.output_ab(
-                DacOutput::clamp(self.accelerator_position.low()),
-                DacOutput::clamp(self.accelerator_position.high()),
+                self.accelerator_position.low(),
+                self.accelerator_position.high()
             );
 
             self.throttle_pins.spoof_enable.set_high();
@@ -141,7 +140,7 @@ impl ThrottleModule {
         let accelerator_position_average = self.accelerator_position.average();
 
         let operator_overridden: bool = self.operator_override_state.condition_exceeded_duration(
-            accelerator_position_average >= ACCELERATOR_OVERRIDE_THRESHOLD,
+            accelerator_position_average.val() >= ACCELERATOR_OVERRIDE_THRESHOLD,
             FAULT_HYSTERESIS,
             timer_ms,
         );

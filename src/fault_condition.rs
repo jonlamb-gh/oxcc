@@ -63,7 +63,7 @@ impl FaultCondition {
         max_duration: u32,
         timer_ms: &MsTimer,
     ) -> bool {
-        let condition_active = (signal.high() == 0) || (signal.low() == 0);
+        let condition_active = (signal.high().val() == 0) || (signal.low().val() == 0);
 
         self.condition_exceeded_duration(condition_active, max_duration, timer_ms)
     }

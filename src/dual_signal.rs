@@ -1,12 +1,14 @@
-use board::{DacSampleAverageCount, DAC_SAMPLE_AVERAGE_COUNT};
-use dac_mcp4922::DacOutput;
+use board::DacSampleAverageCount;
 use num;
-use ranges::{self, BoundedSummation, BoundedConstDiv};
+use ranges::{self, Bounded, BoundedSummation, BoundedConstDiv};
 use typenum::consts::*;
 
+type U4095 = op! { U4096 - U1 };
+pub type AdcInput = Bounded<u16, U0, U4095>;
+
 pub struct DualSignal<T: HighLowReader> {
-    high: u16,
-    low: u16,
+    high: AdcInput,
+    low: AdcInput,
     reader: T,
 }
 
@@ -14,7 +16,7 @@ impl<T> DualSignal<T>
 where
     T: HighLowReader,
 {
-    pub fn new(high: u16, low: u16, high_low_reader: T) -> Self {
+    pub fn new(high: AdcInput, low: AdcInput, high_low_reader: T) -> Self {
         DualSignal {
             high,
             low,
@@ -31,39 +33,35 @@ where
     // single read with large Cycles480 sample time?
     // https://github.com/jonlamb-gh/oscc/blob/devel/firmware/common/libs/dac/oscc_dac.cpp#L17
     pub fn prevent_signal_discontinuity(&mut self) {
-        let low_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| {
-            DacOutput::clamp(self.reader.read_low())
-        });
+        let low_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| self.reader.read_low());
+        let high_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| self.reader.read_high());
 
-        let high_sum = ranges::Summation::<u32, U0, DacSampleAverageCount>::eval(|_| {
-            DacOutput::clamp(self.reader.read_high())
-        });
-
-        let new_low: DacOutput = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(low_sum)));
-        let new_high: DacOutput = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(high_sum)));
-
-        self.low = new_low.move_val();
-        self.high = new_high.move_val();
+        self.low = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(low_sum)));
+        self.high = ranges::retype(ranges::coerce(ranges::ConstDiv::<DacSampleAverageCount>::eval(high_sum)));
     }
 
-    pub fn average(&self) -> u16 {
-        ((u32::from(self.low) + u32::from(self.high)) / 2) as u16
+    pub fn average(&self) -> AdcInput {
+        let low: u16 = self.low.val();
+        let high: u16 = self.high.val();
+        AdcInput::clamp(((u32::from(high) + u32::from(low)) / 2) as u16)
     }
 
     pub fn diff(&self) -> u16 {
-        num::abs(i32::from(self.high) - i32::from(self.low)) as u16
+        let low: u16 = self.low.val();
+        let high: u16 = self.high.val();
+        num::abs(i32::from(high) - i32::from(low)) as u16
     }
 
-    pub fn high(&self) -> u16 {
+    pub fn high(&self) -> AdcInput {
         self.high
     }
 
-    pub fn low(&self) -> u16 {
+    pub fn low(&self) -> AdcInput {
         self.low
     }
 }
 
 pub trait HighLowReader {
-    fn read_high(&self) -> u16;
-    fn read_low(&self) -> u16;
+    fn read_high(&self) -> AdcInput;
+    fn read_low(&self) -> AdcInput;
 }
