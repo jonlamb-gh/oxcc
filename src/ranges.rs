@@ -57,9 +57,11 @@ impl_primitive_bounds!(u8, U0, op!{U256 - U1});
 impl_primitive_bounds!(u16, U0, op!{U65536 - U1});
 impl_primitive_bounds!(u32, U0, op!{U4294967296 - U1});
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Bounded<T, L, U>
 where
+    T: Copy + Clone,
+
     // U <= T::Max
     T: PrimitiveBounds,
     U: Cmp<<T as PrimitiveBounds>::Max>,
@@ -77,15 +79,9 @@ where
     _upper_inclusive: PhantomData<U>,
 }
 
-#[derive(Debug)]
-pub enum BoundedError {
-    LTLower,
-    GTUpper,
-}
-
 impl<T, L, U> Bounded<T, L, U>
 where
-    T: PartialOrd,
+    T: PartialOrd + Copy + Clone,
     L: ReifyTo<T>,
     U: ReifyTo<T>,
 
@@ -101,35 +97,8 @@ where
     L: IsGreaterOrEqualPrivate<<T as PrimitiveBounds>::Min, <L as Cmp<<T as PrimitiveBounds>::Min>>::Output>,
     <L as IsGreaterOrEqualPrivate<<T as PrimitiveBounds>::Min, <L as Cmp<<T as PrimitiveBounds>::Min>>::Output>>::Output: Same<B1>,
 {
-    pub fn new(val: T) -> Result<Bounded<T, L, U>, BoundedError> {
-        // TODO: check that upper >= lower
-        if val < L::reify() {
-            Err(BoundedError::LTLower)
-        } else if val > U::reify() {
-            Err(BoundedError::GTUpper)
-        } else {
-            Ok(Bounded {
-                val,
-                _lower_inclusive: PhantomData,
-                _upper_inclusive: PhantomData,
-            })
-        }
-    }
-
-    pub fn val(&self) -> &T {
-        &self.val
-    }
-
-    pub fn move_val(self) -> T {
+    pub fn val(&self) -> T {
         self.val
-    }
-
-    pub fn upper_bound(&self) -> T {
-        U::reify()
-    }
-
-    pub fn lower_bound(&self) -> T {
-        L::reify()
     }
 
     pub fn clamp(val: T) -> Bounded<T, L, U> {
@@ -145,7 +114,7 @@ pub fn coerce<T, Lower1, Upper1, Lower2, Upper2>(
     b: Bounded<T, Lower1, Upper1>,
 ) -> Bounded<T, Lower2, Upper2>
 where
-    T: PartialOrd,
+    T: PartialOrd + Copy + Clone,
     Lower1: ReifyTo<T>,
     Upper1: ReifyTo<T>,
     Lower2: ReifyTo<T>,
@@ -211,6 +180,7 @@ pub struct Summation<SumT, SumL: ReifyTo<usize>, SumU: ReifyTo<usize>> {
 pub trait BoundedSummation<F, T, L, U>
 where
     F: Fn(usize) -> Bounded<T, L, U>,
+    T: Copy + Clone,
 
     // U <= T::Max
     T: PrimitiveBounds,
@@ -230,11 +200,11 @@ where
 
 impl<SumT, SumL, SumU, F, T, L, U> BoundedSummation<F, T, L, U> for Summation<SumT, SumL, SumU>
 where
-    SumT: Default + AddAssign + From<T>,
+    SumT: Default + AddAssign + From<T> + Copy + Clone,
     SumL: ReifyTo<usize>,
     SumU: ReifyTo<usize> + Sub<SumL>,
     F: Fn(usize) -> Bounded<T, L, U>,
-    T: PartialOrd,
+    T: PartialOrd + Copy + Clone,
     L: ReifyTo<T> + Mul<op!{SumU - SumL}>,
     U: ReifyTo<T> + Mul<op!{SumU - SumL}>,
 
@@ -278,7 +248,7 @@ where
     fn eval(f: F) -> Self::Output {
         let mut sum: SumT = SumT::default();
         for index in SumL::reify()..SumU::reify() {
-            sum += f(index).move_val().into();
+            sum += f(index).val().into();
         }
 
         Bounded {
@@ -295,6 +265,8 @@ pub struct ConstDiv<Divisor> {
 
 pub trait BoundedConstDiv<T, L, U>
 where
+    T: Copy + Clone,
+
     // U <= T::Max
     T: PrimitiveBounds,
     U: Cmp<<T as PrimitiveBounds>::Max>,
@@ -313,7 +285,7 @@ where
 
 impl<T, L, U, Divisor> BoundedConstDiv<T, L, U> for ConstDiv<Divisor>
 where
-    T: PartialOrd + Div + From<<T as Div>::Output>,
+    T: PartialOrd + Div + From<<T as Div>::Output> + Copy + Clone,
     L: ReifyTo<T> + Div<Divisor>,
     U: ReifyTo<T> + Div<Divisor>,
     Divisor: ReifyTo<T>,
@@ -344,7 +316,7 @@ where
 
     fn eval(b: Bounded<T, L, U>) -> Self::Output {
         Bounded {
-            val: (b.move_val() / Divisor::reify()).into(),
+            val: (b.val() / Divisor::reify()).into(),
             _lower_inclusive: PhantomData,
             _upper_inclusive: PhantomData,
         }
@@ -380,8 +352,8 @@ impl_lossy_coerce_num!(u32, u32);
 
 pub fn retype<T1, T2, L, U>(b: Bounded<T1, L, U>) -> Bounded<T2, L, U>
 where
-    T1: PartialOrd + LossyCoerceNum<T2>,
-    T2: PartialOrd,
+    T1: PartialOrd + LossyCoerceNum<T2> + Copy + Clone,
+    T2: PartialOrd + Copy + Clone,
     L: ReifyTo<T1> + ReifyTo<T2>,
     U: ReifyTo<T1> + ReifyTo<T2>,
 
@@ -410,7 +382,7 @@ where
     <L as IsGreaterOrEqualPrivate<<T2 as PrimitiveBounds>::Min, <L as Cmp<<T2 as PrimitiveBounds>::Min>>::Output>>::Output: Same<B1>,
 {
     Bounded {
-        val: b.move_val().lossy_coerce_num(),
+        val: b.val().lossy_coerce_num(),
         _lower_inclusive: PhantomData,
         _upper_inclusive: PhantomData,
     }
