@@ -379,7 +379,6 @@ pub const THROTTLE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 3446;
 
 pub type ThrottleSpoofHighSignal = ranges::Bounded<u16, U620, U3446>;
 
-
 /*
  * @brief Calculation to convert a throttle position to a low spoof voltage. */
 //

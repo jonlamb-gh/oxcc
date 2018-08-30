@@ -147,7 +147,6 @@ pub const BRAKE_SPOOF_HIGH_SIGNAL_RANGE_MAX: u16 = 1875;
 
 pub type BrakeSpoofHighSignal = ranges::Bounded<u16, U572, U1875>;
 
-
 /*
  * @brief Calculation to convert a brake position to a low spoof voltage. */
 //
