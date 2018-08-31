@@ -170,7 +170,7 @@ fn main() -> ! {
 
         // check the control CAN FIFOs for any frames to be processed
         if let Err(e) =
-            check_and_process_control_can_frames(&mut modules, &mut can_gateway, &mut debug_console)
+            process_control_can_frames(&mut modules, &mut can_gateway, &mut debug_console)
         {
             handle_error(
                 e,
@@ -182,19 +182,24 @@ fn main() -> ! {
         }
 
         // check modules for fault conditions, sending reports as needed
+        // NOTE
+        // ignoring transmit timeouts until a proper error handling strategy is
+        // implemented
         if let Err(e) = check_for_faults(
             &mut modules,
             &mut can_gateway,
             &timer_ms,
             &mut debug_console,
         ) {
-            handle_error(
-                e,
-                &mut modules,
-                &mut can_gateway,
-                &mut debug_console,
-                &mut board.leds,
-            );
+            if e != OxccError::Can(CanError::Timeout) {
+                handle_error(
+                    e,
+                    &mut modules,
+                    &mut can_gateway,
+                    &mut debug_console,
+                    &mut board.leds,
+                );
+            }
         }
 
         // republish OBD frames to control CAN bus
@@ -232,7 +237,7 @@ fn main() -> ! {
     }
 }
 
-fn check_and_process_control_can_frames(
+fn process_control_can_frames(
     modules: &mut ControlModules,
     can_gateway: &mut CanGatewayModule,
     debug_console: &mut DebugConsole,
@@ -285,23 +290,34 @@ fn check_for_faults(
     Ok(())
 }
 
+// NOTE
+// ignoring transmit timeouts until a proper error handling strategy is
+// implemented
 fn publish_reports(
     modules: &mut ControlModules,
     can_gateway: &mut CanGatewayModule,
 ) -> Result<(), OxccError> {
-    // attempt to publish them all, only report the first to fail
+    // attempt to publish them all, only report the last to fail
     let mut result = Ok(());
 
+    // it is typically to get timeout errors if the CAN bus is not active or
+    // there are no other nodes connected to it
     if let Err(e) = can_gateway.publish_brake_report(modules.brake.supply_brake_report()) {
-        result = Err(OxccError::from(e));
+        if e != CanError::Timeout {
+            result = Err(OxccError::from(e));
+        }
     }
 
     if let Err(e) = can_gateway.publish_throttle_report(modules.throttle.supply_throttle_report()) {
-        result = Err(OxccError::from(e));
+        if e != CanError::Timeout {
+            result = Err(OxccError::from(e));
+        }
     }
 
     if let Err(e) = can_gateway.publish_steering_report(modules.steering.supply_steering_report()) {
-        result = Err(OxccError::from(e));
+        if e != CanError::Timeout {
+            result = Err(OxccError::from(e));
+        }
     }
 
     result
@@ -315,33 +331,26 @@ fn handle_error(
     debug_console: &mut DebugConsole,
     leds: &mut Leds,
 ) {
-    let mut ignore_error: bool = false;
+    leds[Color::Red].on();
 
-    // it is typically to get timeout errors if the CAN bus is not active or
-    // there are no other nodes connected to it
-    if error == OxccError::CanBusTxTimeout {
-        ignore_error = true;
-    }
+    writeln!(debug_console, "ERROR: {:#?}", error).expect(DEBUG_WRITE_FAILURE);
 
-    if !ignore_error {
-        leds[Color::Red].on();
+    // disable all controls
+    let _ = modules.throttle.disable_control(debug_console);
+    let _ = modules.steering.disable_control(debug_console);
+    let _ = modules.brake.disable_control(debug_console);
 
-        writeln!(debug_console, "ERROR: {:#?}", error).expect(DEBUG_WRITE_FAILURE);
-
-        // disable all controls
-        let _ = modules.throttle.disable_control(debug_console);
-        let _ = modules.steering.disable_control(debug_console);
-        let _ = modules.brake.disable_control(debug_console);
-
-        // publish reports
-        let _ = publish_reports(modules, can_gateway);
-    }
+    // publish reports
+    let _ = publish_reports(modules, can_gateway);
 }
 
 exception!(HardFault, hard_fault);
 
-// TODO - any safety related things we can do in these contexts (disable
-// controls, LEDs, etc)?
+// TODO - any safety related things we can do in these contexts?
+// Might be worth implementing a panic handler here as well
+// For example:
+// - disable controls
+// - indication LED
 fn hard_fault(ef: &ExceptionFrame) -> ! {
     hard_fault_indicator();
     panic!("HardFault at {:#?}", ef);

@@ -87,46 +87,49 @@ impl UnpreparedSteeringModule {
 
 impl SteeringModule {
     pub fn disable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
-        let mut result = Ok(());
-
         if self.control_state.enabled {
             self.steering_torque.prevent_signal_discontinuity();
 
-            if let Err(_) = self.steering_dac.output_ab(
+            let result = self.steering_dac.output_ab(
                 DacOutput::clamp(self.steering_torque.low()),
                 DacOutput::clamp(self.steering_torque.high()),
-            ) {
-                result = Err(OxccError::IO);
-            }
+            );
 
             // even if we've encountered an error, we can still disable
             self.steering_pins.spoof_enable.set_low();
             self.control_state.enabled = false;
             writeln!(debug_console, "Steering control disabled");
+
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
+            } else {
+                Ok(())
+            };
         }
 
-        result
+        Ok(())
     }
 
     pub fn enable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
-        let mut result = Ok(());
-
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.steering_torque.prevent_signal_discontinuity();
 
-            if let Err(_) = self.steering_dac.output_ab(
+            let result = self.steering_dac.output_ab(
                 DacOutput::clamp(self.steering_torque.low()),
                 DacOutput::clamp(self.steering_torque.high()),
-            ) {
-                result = Err(OxccError::IO);
+            );
+
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
             } else {
                 self.steering_pins.spoof_enable.set_high();
                 self.control_state.enabled = true;
                 writeln!(debug_console, "Steering control enabled");
-            }
+                Ok(())
+            };
         }
 
-        result
+        Ok(())
     }
 
     pub fn update_steering(

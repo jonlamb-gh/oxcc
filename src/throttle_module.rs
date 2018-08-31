@@ -85,46 +85,49 @@ impl UnpreparedThrottleModule {
 
 impl ThrottleModule {
     pub fn disable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
-        let mut result = Ok(());
-
         if self.control_state.enabled {
             self.accelerator_position.prevent_signal_discontinuity();
 
-            if let Err(_) = self.throttle_dac.output_ab(
+            let result = self.throttle_dac.output_ab(
                 DacOutput::clamp(self.accelerator_position.low()),
                 DacOutput::clamp(self.accelerator_position.high()),
-            ) {
-                result = Err(OxccError::IO);
-            }
+            );
 
             // even if we've encountered an error, we can still disable
             self.throttle_pins.spoof_enable.set_low();
             self.control_state.enabled = false;
             writeln!(debug_console, "Throttle control disabled");
+
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
+            } else {
+                Ok(())
+            };
         }
 
-        result
+        Ok(())
     }
 
     fn enable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
-        let mut result = Ok(());
-
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.accelerator_position.prevent_signal_discontinuity();
 
-            if let Err(_) = self.throttle_dac.output_ab(
+            let result = self.throttle_dac.output_ab(
                 DacOutput::clamp(self.accelerator_position.low()),
                 DacOutput::clamp(self.accelerator_position.high()),
-            ) {
-                result = Err(OxccError::IO);
+            );
+
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
             } else {
                 self.throttle_pins.spoof_enable.set_high();
                 self.control_state.enabled = true;
                 writeln!(debug_console, "Throttle control enabled");
-            }
+                Ok(())
+            };
         }
 
-        result
+        Ok(())
     }
 
     fn update_throttle(

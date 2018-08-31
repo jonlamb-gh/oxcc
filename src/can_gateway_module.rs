@@ -37,6 +37,7 @@ impl CanGatewayModule {
             steering_report_can_frame: default_steering_report_data_frame(),
         }
     }
+
     pub fn republish_obd_frames_to_control_can_bus(&mut self) -> Result<(), OxccError> {
         // poll both OBD CAN FIFOs
         for fifo in &[RxFifo::Fifo0, RxFifo::Fifo1] {
@@ -53,14 +54,10 @@ impl CanGatewayModule {
         frame: &CanFrame,
     ) -> Result<(), OxccError> {
         let id: u32 = frame.id().into();
-        let mut is_a_match = false;
 
-        if (id == KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID.into())
+        let mut is_a_match = (id == KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID.into())
             || (id == KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID.into())
-            || (id == KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID.into())
-        {
-            is_a_match = true;
-        }
+            || (id == KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID.into());
 
         #[cfg(feature = "kia-soul-ev")]
         {
