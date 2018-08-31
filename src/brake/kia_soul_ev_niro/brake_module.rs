@@ -15,6 +15,7 @@ use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
+use oxcc_error::OxccError;
 use ranges;
 use vehicle::*;
 
@@ -84,38 +85,58 @@ impl UnpreparedBrakeModule {
 }
 
 impl BrakeModule {
-    fn disable_control(&mut self, debug_console: &mut DebugConsole) {
+    pub fn disable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
         if self.control_state.enabled {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
-            self.brake_dac.output_ab(
+            let result = self.brake_dac.output_ab(
                 DacOutput::clamp(self.brake_pedal_position.low()),
                 DacOutput::clamp(self.brake_pedal_position.high()),
             );
 
+            // even if we've encountered an error, we can still disable
             self.brake_pins.spoof_enable.set_low();
             self.brake_pins.brake_light_enable.set_low();
             self.control_state.enabled = false;
             writeln!(debug_console, "Brake control disabled");
+
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
+            } else {
+                Ok(())
+            };
         }
+
+        Ok(())
     }
 
-    fn enable_control(&mut self, debug_console: &mut DebugConsole) {
+    fn enable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.brake_pedal_position.prevent_signal_discontinuity();
 
-            self.brake_dac.output_ab(
+            let result = self.brake_dac.output_ab(
                 DacOutput::clamp(self.brake_pedal_position.low()),
                 DacOutput::clamp(self.brake_pedal_position.high()),
             );
 
-            self.brake_pins.spoof_enable.set_high();
-            self.control_state.enabled = true;
-            writeln!(debug_console, "Brake control enabled");
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
+            } else {
+                self.brake_pins.spoof_enable.set_high();
+                self.control_state.enabled = true;
+                writeln!(debug_console, "Brake control enabled");
+                Ok(())
+            };
         }
+
+        Ok(())
     }
 
-    fn update_brake(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
+    fn update_brake(
+        &mut self,
+        spoof_command_high: u16,
+        spoof_command_low: u16,
+    ) -> Result<(), OxccError> {
         if self.control_state.enabled {
             let spoof_high = BrakeSpoofHighSignal::clamp(spoof_command_high);
             let spoof_low = BrakeSpoofLowSignal::clamp(spoof_command_low);
@@ -130,20 +151,22 @@ impl BrakeModule {
 
             // TODO - revisit this, enforce high->A, low->B
             self.brake_dac
-                .output_ab(ranges::coerce(spoof_high), ranges::coerce(spoof_low));
+                .output_ab(ranges::coerce(spoof_high), ranges::coerce(spoof_low))?;
         }
+
+        Ok(())
     }
 
     pub fn check_for_faults(
         &mut self,
         timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
-    ) -> Option<&OsccFaultReport> {
+    ) -> Result<Option<&OsccFaultReport>, OxccError> {
         if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
             // Assumes this module already went through the proper transition into a faulted
             // and disabled state, and we do not want to double-report a possible duplicate
             // fault.
-            return None;
+            return Ok(None);
         }
 
         self.brake_pedal_position.update();
@@ -164,7 +187,7 @@ impl BrakeModule {
 
         // sensor pins tied to ground - a value of zero indicates disconnection
         if inputs_grounded {
-            self.disable_control(debug_console);
+            self.disable_control(debug_console)?;
 
             self.control_state
                 .dtcs
@@ -177,9 +200,9 @@ impl BrakeModule {
                 "Bad value read from brake pedal position sensor"
             );
 
-            Some(&self.fault_report)
+            Ok(Some(&self.fault_report))
         } else if operator_overridden && !self.control_state.operator_override {
-            self.disable_control(debug_console);
+            self.disable_control(debug_console)?;
 
             self.control_state
                 .dtcs
@@ -191,11 +214,11 @@ impl BrakeModule {
 
             writeln!(debug_console, "Brake operator override");
 
-            Some(&self.fault_report)
+            Ok(Some(&self.fault_report))
         } else {
             self.control_state.dtcs.clear_all();
             self.control_state.operator_override = false;
-            None
+            Ok(None)
         }
     }
 
@@ -210,41 +233,46 @@ impl BrakeModule {
         &self.brake_report
     }
 
-    // TODO - error handling
-    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, debug_console: &mut DebugConsole) {
+    pub fn process_rx_frame(
+        &mut self,
+        can_frame: &CanFrame,
+        debug_console: &mut DebugConsole,
+    ) -> Result<(), OxccError> {
         if let CanFrame::DataFrame(ref frame) = can_frame {
             let id: u32 = frame.id().into();
             let data = frame.data();
 
             if (data[0] == OSCC_MAGIC_BYTE_0) && (data[1] == OSCC_MAGIC_BYTE_1) {
                 if id == OSCC_BRAKE_ENABLE_CAN_ID.into() {
-                    self.enable_control(debug_console);
+                    self.enable_control(debug_console)?;
                 } else if id == OSCC_BRAKE_DISABLE_CAN_ID.into() {
-                    self.disable_control(debug_console);
+                    self.disable_control(debug_console)?;
                 } else if id == OSCC_BRAKE_COMMAND_CAN_ID.into() {
-                    self.process_brake_command(&OsccBrakeCommand::from(frame));
+                    self.process_brake_command(&OsccBrakeCommand::from(frame))?;
                 } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
-                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console);
+                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console)?;
                 }
             }
         }
+
+        Ok(())
     }
 
     fn process_fault_report(
         &mut self,
         fault_report: &OsccFaultReport,
         debug_console: &mut DebugConsole,
-    ) {
-        self.disable_control(debug_console);
-
+    ) -> Result<(), OxccError> {
         writeln!(
             debug_console,
             "Fault report received from: {} DTCs: {}",
             fault_report.fault_origin_id, fault_report.dtcs
         );
+
+        self.disable_control(debug_console)
     }
 
-    fn process_brake_command(&mut self, command: &OsccBrakeCommand) {
+    fn process_brake_command(&mut self, command: &OsccBrakeCommand) -> Result<(), OxccError> {
         let clamped_position = num::clamp(
             command.pedal_command,
             MINIMUM_BRAKE_COMMAND,
@@ -266,7 +294,7 @@ impl BrakeModule {
         let spoof_value_low = (STEPS_PER_VOLT * spoof_voltage_low) as u16;
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
-        self.update_brake(spoof_value_high, spoof_value_low);
+        self.update_brake(spoof_value_high, spoof_value_low)
     }
 }
 

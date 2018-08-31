@@ -44,6 +44,8 @@ impl FaultCondition {
                 self.condition_start_time = now;
             }
 
+            // TODO - need to fix this ported logic
+            // panicked at 'attempt to subtract with overflow', src/fault_condition.rs:47:28
             let duration = now - self.condition_start_time;
 
             if duration >= max_duration {

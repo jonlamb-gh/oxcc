@@ -2,8 +2,9 @@
 // - latching
 // - gain
 // - buffer vref
+// - other errors?
 
-use embedded_hal::blocking::spi::Transfer;
+use embedded_hal::blocking::spi::Write;
 use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 
@@ -27,6 +28,18 @@ pub enum Channel {
     ChannelB,
 }
 
+#[derive(Debug)]
+pub enum Error<E> {
+    /// SPI error
+    Spi(E),
+}
+
+impl<E> From<E> for Error<E> {
+    fn from(e: E) -> Self {
+        Error::Spi(e)
+    }
+}
+
 pub struct Mcp4922<SPI, CS> {
     spi: SPI,
     cs: CS,
@@ -34,7 +47,7 @@ pub struct Mcp4922<SPI, CS> {
 
 impl<SPI, CS, E> Mcp4922<SPI, CS>
 where
-    SPI: Transfer<u8, Error = E>,
+    SPI: Write<u8, Error = E>,
     CS: OutputPin,
 {
     pub fn new(spi: SPI, mut cs: CS) -> Self {
@@ -44,19 +57,20 @@ where
         Mcp4922 { spi, cs }
     }
 
-    pub fn output_ab(&mut self, output_a: DacOutput, output_b: DacOutput) {
+    pub fn output_ab(&mut self, output_a: DacOutput, output_b: DacOutput) -> Result<(), E> {
         // TODO latching?
-        self.output(output_a, Channel::ChannelA);
-        self.output(output_b, Channel::ChannelB);
+        self.output(output_a, Channel::ChannelA)?;
+        self.output(output_b, Channel::ChannelB)
     }
 
-    pub fn output(&mut self, data: DacOutput, channel: Channel) {
+    pub fn output(&mut self, data: DacOutput, channel: Channel) -> Result<(), E> {
         self.cs.set_low();
 
+        // NOTE: swapping the bytes here, the HAL should be able to handle such a thing
         let mut buffer = [0u8; 2];
         // bits 11 through 0: data
-        buffer[0] = (data.val() & 0x00FF) as _;
-        buffer[1] = ((data.val() >> 8) & (0x000F as u16)) as u8
+        buffer[1] = (data.val() & 0x00FF) as _;
+        buffer[0] = ((data.val() >> 8) & (0x000F as u16)) as u8
             // bit 12: shutdown bit. 1 for active operation
             | (1 << 4)
             // bit 13: gain bit; 0 for 1x gain, 1 for 2x
@@ -64,11 +78,14 @@ where
             // bit 15: 0 for DAC A, 1 for DAC B
             | u8::from(channel) << 7;
 
-        if self.spi.transfer(&mut buffer).is_err() {
-            // TODO - error handling
+        if let Err(e) = self.spi.write(&buffer) {
+            self.cs.set_high();
+            return Err(e);
         }
 
         self.cs.set_high();
+
+        Ok(())
     }
 }
 

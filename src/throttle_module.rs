@@ -13,6 +13,7 @@ use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
 use num;
 use oscc_magic_byte::*;
+use oxcc_error::OxccError;
 use ranges;
 use throttle_can_protocol::*;
 use types::*;
@@ -83,44 +84,66 @@ impl UnpreparedThrottleModule {
 }
 
 impl ThrottleModule {
-    fn disable_control(&mut self, debug_console: &mut DebugConsole) {
+    pub fn disable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
         if self.control_state.enabled {
             self.accelerator_position.prevent_signal_discontinuity();
 
-            self.throttle_dac.output_ab(
+            let result = self.throttle_dac.output_ab(
                 DacOutput::clamp(self.accelerator_position.low()),
                 DacOutput::clamp(self.accelerator_position.high()),
             );
 
+            // even if we've encountered an error, we can still disable
             self.throttle_pins.spoof_enable.set_low();
             self.control_state.enabled = false;
             writeln!(debug_console, "Throttle control disabled");
+
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
+            } else {
+                Ok(())
+            };
         }
+
+        Ok(())
     }
 
-    fn enable_control(&mut self, debug_console: &mut DebugConsole) {
+    fn enable_control(&mut self, debug_console: &mut DebugConsole) -> Result<(), OxccError> {
         if !self.control_state.enabled && !self.control_state.operator_override {
             self.accelerator_position.prevent_signal_discontinuity();
 
-            self.throttle_dac.output_ab(
+            let result = self.throttle_dac.output_ab(
                 DacOutput::clamp(self.accelerator_position.low()),
                 DacOutput::clamp(self.accelerator_position.high()),
             );
 
-            self.throttle_pins.spoof_enable.set_high();
-            self.control_state.enabled = true;
-            writeln!(debug_console, "Throttle control enabled");
+            return if let Err(e) = result {
+                Err(OxccError::from(e))
+            } else {
+                self.throttle_pins.spoof_enable.set_high();
+                self.control_state.enabled = true;
+                writeln!(debug_console, "Throttle control enabled");
+                Ok(())
+            };
         }
+
+        Ok(())
     }
 
-    fn update_throttle(&mut self, spoof_command_high: u16, spoof_command_low: u16) {
+    fn update_throttle(
+        &mut self,
+        spoof_command_high: u16,
+        spoof_command_low: u16,
+    ) -> Result<(), OxccError> {
         if self.control_state.enabled {
             // TODO - revisit this, enforce high->A, low->B
             self.throttle_dac.output_ab(
                 ranges::coerce(ThrottleSpoofHighSignal::clamp(spoof_command_high)),
                 ranges::coerce(ThrottleSpoofHighSignal::clamp(spoof_command_low)),
-            );
+            )?;
         }
+
+        Ok(())
     }
 
     /// Checks for any fresh (previously undetected or unhandled) faults
@@ -128,12 +151,12 @@ impl ThrottleModule {
         &mut self,
         timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
-    ) -> Option<&OsccFaultReport> {
+    ) -> Result<Option<&OsccFaultReport>, OxccError> {
         if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
             // Assumes this module already went through the proper transition into a faulted
             // and disabled state, and we do not want to double-report a possible duplicate
             // fault.
-            return None;
+            return Ok(None);
         }
 
         self.accelerator_position.update();
@@ -154,7 +177,7 @@ impl ThrottleModule {
 
         // sensor pins tied to ground - a value of zero indicates disconnection
         if inputs_grounded {
-            self.disable_control(debug_console);
+            self.disable_control(debug_console)?;
 
             self.control_state
                 .dtcs
@@ -167,9 +190,9 @@ impl ThrottleModule {
                 "Bad value read from accelerator position sensor"
             );
 
-            Some(&self.fault_report)
+            Ok(Some(&self.fault_report))
         } else if operator_overridden && !self.control_state.operator_override {
-            self.disable_control(debug_console);
+            self.disable_control(debug_console)?;
 
             self.control_state
                 .dtcs
@@ -181,11 +204,11 @@ impl ThrottleModule {
 
             writeln!(debug_console, "Throttle operator override");
 
-            Some(&self.fault_report)
+            Ok(Some(&self.fault_report))
         } else {
             self.control_state.dtcs.clear_all();
             self.control_state.operator_override = false;
-            None
+            Ok(None)
         }
     }
 
@@ -200,41 +223,46 @@ impl ThrottleModule {
         &self.throttle_report
     }
 
-    // TODO - error handling
-    pub fn process_rx_frame(&mut self, can_frame: &CanFrame, debug_console: &mut DebugConsole) {
+    pub fn process_rx_frame(
+        &mut self,
+        can_frame: &CanFrame,
+        debug_console: &mut DebugConsole,
+    ) -> Result<(), OxccError> {
         if let CanFrame::DataFrame(ref frame) = can_frame {
             let id: u32 = frame.id().into();
             let data = frame.data();
 
             if (data[0] == OSCC_MAGIC_BYTE_0) && (data[1] == OSCC_MAGIC_BYTE_1) {
                 if id == OSCC_THROTTLE_ENABLE_CAN_ID.into() {
-                    self.enable_control(debug_console);
+                    self.enable_control(debug_console)?;
                 } else if id == OSCC_THROTTLE_DISABLE_CAN_ID.into() {
-                    self.disable_control(debug_console);
+                    self.disable_control(debug_console)?;
                 } else if id == OSCC_THROTTLE_COMMAND_CAN_ID.into() {
-                    self.process_throttle_command(&OsccThrottleCommand::from(frame));
+                    self.process_throttle_command(&OsccThrottleCommand::from(frame))?;
                 } else if id == OSCC_FAULT_REPORT_CAN_ID.into() {
-                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console);
+                    self.process_fault_report(&OsccFaultReport::from(frame), debug_console)?;
                 }
             }
         }
+
+        Ok(())
     }
 
     fn process_fault_report(
         &mut self,
         fault_report: &OsccFaultReport,
         debug_console: &mut DebugConsole,
-    ) {
-        self.disable_control(debug_console);
-
+    ) -> Result<(), OxccError> {
         writeln!(
             debug_console,
             "Fault report received from: {} DTCs: {}",
             fault_report.fault_origin_id, fault_report.dtcs
         );
+
+        self.disable_control(debug_console)
     }
 
-    fn process_throttle_command(&mut self, command: &OsccThrottleCommand) {
+    fn process_throttle_command(&mut self, command: &OsccThrottleCommand) -> Result<(), OxccError> {
         let clamped_position = num::clamp(
             command.torque_request,
             MINIMUM_THROTTLE_COMMAND,
@@ -256,6 +284,6 @@ impl ThrottleModule {
         let spoof_value_low = (STEPS_PER_VOLT * spoof_voltage_low) as u16;
         let spoof_value_high = (STEPS_PER_VOLT * spoof_voltage_high) as u16;
 
-        self.update_throttle(spoof_value_high, spoof_value_low);
+        self.update_throttle(spoof_value_high, spoof_value_low)
     }
 }

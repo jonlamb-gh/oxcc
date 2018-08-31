@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "stm32f767-hal"
 version = "0.0.1"
-source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#eb667d5ef38cc0eb0a307bff35cb8c32fb2ec5b6"
+source = "git+https://github.com/jonlamb-gh/stm32f767-hal.git?branch=devel#3806af4aed6cc453dc593522ae7c4537ace66c57"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",

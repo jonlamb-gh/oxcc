@@ -5,12 +5,11 @@ use fault_can_protocol::*;
 use nucleo_f767zi::hal::can::{CanError, CanFrame, DataFrame, RxFifo};
 use nucleo_f767zi::hal::prelude::*;
 use oscc_magic_byte::*;
+use oxcc_error::OxccError;
 use steering_can_protocol::*;
 use throttle_can_protocol::*;
 use types::*;
 use vehicle::*;
-
-// TODO - use some form of println! logging that prefixes with a module name?
 
 pub struct CanGatewayModule {
     can_publish_timer: CanPublishTimer,
@@ -38,26 +37,27 @@ impl CanGatewayModule {
             steering_report_can_frame: default_steering_report_data_frame(),
         }
     }
-    pub fn republish_obd_frames_to_control_can_bus(&mut self) {
+
+    pub fn republish_obd_frames_to_control_can_bus(&mut self) -> Result<(), OxccError> {
         // poll both OBD CAN FIFOs
         for fifo in &[RxFifo::Fifo0, RxFifo::Fifo1] {
             if let Ok(rx_frame) = self.obd_can().receive(fifo) {
-                self.republish_obd_frame_to_control_can_bus(&rx_frame);
+                self.republish_obd_frame_to_control_can_bus(&rx_frame)?;
             }
         }
+
+        Ok(())
     }
 
-    // TODO - error handling
-    fn republish_obd_frame_to_control_can_bus(&mut self, frame: &CanFrame) {
+    fn republish_obd_frame_to_control_can_bus(
+        &mut self,
+        frame: &CanFrame,
+    ) -> Result<(), OxccError> {
         let id: u32 = frame.id().into();
-        let mut is_a_match = false;
 
-        if (id == KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID.into())
+        let mut is_a_match = (id == KIA_SOUL_OBD_STEERING_WHEEL_ANGLE_CAN_ID.into())
             || (id == KIA_SOUL_OBD_WHEEL_SPEED_CAN_ID.into())
-            || (id == KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID.into())
-        {
-            is_a_match = true;
-        }
+            || (id == KIA_SOUL_OBD_BRAKE_PRESSURE_CAN_ID.into());
 
         #[cfg(feature = "kia-soul-ev")]
         {
@@ -66,9 +66,11 @@ impl CanGatewayModule {
             }
         }
 
-        if is_a_match && self.control_can().transmit(&frame).is_err() {
-            // TODO - error handling
+        if is_a_match {
+            self.control_can().transmit(&frame)?;
         }
+
+        Ok(())
     }
 
     // TODO - hide these details, switch to a publisher approach
