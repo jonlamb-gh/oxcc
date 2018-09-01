@@ -9,7 +9,6 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
-use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
@@ -41,8 +40,8 @@ where
 pub struct BrakeModule {
     brake_pedal_position: DualSignal<BrakePedalPositionSensor>,
     control_state: BrakeControlState<u8>,
-    grounded_fault_state: FaultCondition,
-    operator_override_state: FaultCondition,
+    grounded_fault_state: FaultCondition<BrakeGroundedFaultTimer>,
+    operator_override_state: FaultCondition<BrakeOverrideFaultTimer>,
     brake_report: OsccBrakeReport,
     fault_report: OsccFaultReport,
     brake_dac: BrakeDac,
@@ -58,13 +57,15 @@ impl UnpreparedBrakeModule {
         brake_dac: BrakeDac,
         brake_pins: BrakePins,
         brake_pedal_position_sensor: BrakePedalPositionSensor,
+        grounded_fault_timer: BrakeGroundedFaultTimer,
+        override_timer: BrakeOverrideFaultTimer,
     ) -> Self {
         UnpreparedBrakeModule {
             brake_module: BrakeModule {
                 brake_pedal_position: DualSignal::new(0, 0, brake_pedal_position_sensor),
                 control_state: BrakeControlState::new(u8::default()),
-                grounded_fault_state: FaultCondition::new(),
-                operator_override_state: FaultCondition::new(),
+                grounded_fault_state: FaultCondition::new(grounded_fault_timer),
+                operator_override_state: FaultCondition::new(override_timer),
                 brake_report: OsccBrakeReport::new(),
                 fault_report: OsccFaultReport {
                     fault_origin_id: FAULT_ORIGIN_BRAKE,
@@ -159,7 +160,6 @@ impl BrakeModule {
 
     pub fn check_for_faults(
         &mut self,
-        timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
     ) -> Result<Option<&OsccFaultReport>, OxccError> {
         if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
@@ -175,15 +175,11 @@ impl BrakeModule {
 
         let operator_overridden: bool = self.operator_override_state.condition_exceeded_duration(
             brake_pedal_position_average >= BRAKE_PEDAL_OVERRIDE_THRESHOLD.into(),
-            FAULT_HYSTERESIS,
-            timer_ms,
         );
 
-        let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
-            &self.brake_pedal_position,
-            FAULT_HYSTERESIS,
-            timer_ms,
-        );
+        let inputs_grounded: bool = self
+            .grounded_fault_state
+            .check_voltage_grounded(&self.brake_pedal_position);
 
         // sensor pins tied to ground - a value of zero indicates disconnection
         if inputs_grounded {

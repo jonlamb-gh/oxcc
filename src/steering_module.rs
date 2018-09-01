@@ -7,7 +7,6 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
-use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
@@ -43,7 +42,7 @@ where
 pub struct SteeringModule {
     steering_torque: DualSignal<TorqueSensor>,
     control_state: SteeringControlState<u8>,
-    grounded_fault_state: FaultCondition,
+    grounded_fault_state: FaultCondition<SteeringGroundedFaultTimer>,
     filtered_diff: u16,
     steering_report: OsccSteeringReport,
     fault_report: OsccFaultReport,
@@ -60,12 +59,13 @@ impl UnpreparedSteeringModule {
         torque_sensor: TorqueSensor,
         steering_dac: SteeringDac,
         steering_pins: SteeringPins,
+        grounded_fault_timer: SteeringGroundedFaultTimer,
     ) -> Self {
         UnpreparedSteeringModule {
             steering_module: SteeringModule {
                 steering_torque: DualSignal::new(0, 0, torque_sensor),
                 control_state: SteeringControlState::new(u8::default()),
-                grounded_fault_state: FaultCondition::new(),
+                grounded_fault_state: FaultCondition::new(grounded_fault_timer),
                 filtered_diff: 0,
                 steering_report: OsccSteeringReport::new(),
                 fault_report: OsccFaultReport {
@@ -150,7 +150,6 @@ impl SteeringModule {
 
     pub fn check_for_faults(
         &mut self,
-        timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
     ) -> Result<Option<&OsccFaultReport>, OxccError> {
         if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
@@ -176,11 +175,9 @@ impl SteeringModule {
             f32::from(self.filtered_diff),
         ) as _;
 
-        let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
-            &self.steering_torque,
-            FAULT_HYSTERESIS,
-            timer_ms,
-        );
+        let inputs_grounded: bool = self
+            .grounded_fault_state
+            .check_voltage_grounded(&self.steering_torque);
 
         // sensor pins tied to ground - a value of zero indicates disconnection
         if inputs_grounded {
