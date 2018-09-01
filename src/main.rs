@@ -184,16 +184,6 @@ fn main() -> ! {
         // refresh the independent watchdog
         board.wdg.refresh();
 
-        /*
-        brake_countdown_timer.reconfigure_one_pulse_mode();
-
-        if brake_countdown_timer.wait().is_ok() {
-            board.leds[Color::Blue].toggle();
-            //can_gateway.publish_brake_report(modules.brake.supply_brake_report());
-            brake_countdown_timer.reset();
-        }
-        */
-
         // check the control CAN FIFOs for any frames to be processed
         if let Err(e) =
             process_control_can_frames(&mut modules, &mut can_gateway, &mut debug_console)
