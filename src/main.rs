@@ -3,7 +3,6 @@
 #![feature(const_fn)]
 
 extern crate cortex_m;
-#[macro_use]
 extern crate cortex_m_rt as rt;
 #[cfg(feature = "panic-over-semihosting")]
 extern crate cortex_m_semihosting;
@@ -70,7 +69,7 @@ use nucleo_f767zi::hal::can::CanError;
 use nucleo_f767zi::hal::can::RxFifo;
 use nucleo_f767zi::led::{Color, Leds};
 use oxcc_error::OxccError;
-use rt::ExceptionFrame;
+use rt::{entry, exception, ExceptionFrame};
 use steering_can_protocol::SteeringReportPublisher;
 use steering_module::{SteeringModule, UnpreparedSteeringModule};
 use throttle_can_protocol::ThrottleReportPublisher;
@@ -84,8 +83,7 @@ struct ControlModules {
     pub steering: SteeringModule,
 }
 
-entry!(main);
-
+#[entry]
 fn main() -> ! {
     // once the organization is cleaned up, the entire board doesn't need to be
     // mutable let Board {mut leds, mut delay, ..} = Board::new();
@@ -354,21 +352,19 @@ fn handle_error(
     let _ = publish_reports(modules, can_gateway);
 }
 
-exception!(HardFault, hard_fault);
-
 // TODO - any safety related things we can do in these contexts?
 // Might be worth implementing a panic handler here as well
 // For example:
 // - disable controls
 // - indication LED
-fn hard_fault(ef: &ExceptionFrame) -> ! {
+#[exception]
+fn HardFault(ef: &ExceptionFrame) -> ! {
     hard_fault_indicator();
     panic!("HardFault at {:#?}", ef);
 }
 
-exception!(*, default_handler);
-
-fn default_handler(irqn: i16) {
+#[exception]
+fn DefaultHandler(irqn: i16) {
     hard_fault_indicator();
     panic!("Unhandled exception (IRQn = {})", irqn);
 }
