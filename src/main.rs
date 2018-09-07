@@ -24,7 +24,6 @@ mod dac_mcp4922;
 mod dtc;
 mod dual_signal;
 mod fault_condition;
-mod ms_timer;
 mod oxcc_error;
 mod ranges;
 mod steering_module;
@@ -66,7 +65,6 @@ use brake_module::{BrakeModule, UnpreparedBrakeModule};
 use can_gateway_module::CanGatewayModule;
 use core::fmt::Write;
 use fault_can_protocol::FaultReportPublisher;
-use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::can::CanError;
 use nucleo_f767zi::hal::can::RxFifo;
@@ -96,13 +94,17 @@ fn main() -> ! {
         brake_dac,
         brake_pins,
         brake_pedal_position_sensor,
+        brake_grounded_fault_timer,
+        brake_override_fault_timer,
         accelerator_position_sensor,
         throttle_dac,
         throttle_pins,
+        throttle_grounded_fault_timer,
+        throttle_override_fault_timer,
         torque_sensor,
         steering_dac,
         steering_pins,
-        timer_ms,
+        steering_grounded_fault_timer,
         mut debug_console,
         can_publish_timer,
         control_can,
@@ -139,12 +141,26 @@ fn main() -> ! {
         }
     }
 
-    let unprepared_brake_module =
-        UnpreparedBrakeModule::new(brake_dac, brake_pins, brake_pedal_position_sensor);
-    let unprepared_throttle_module =
-        UnpreparedThrottleModule::new(accelerator_position_sensor, throttle_dac, throttle_pins);
-    let unprepared_steering_module =
-        UnpreparedSteeringModule::new(torque_sensor, steering_dac, steering_pins);
+    let unprepared_brake_module = UnpreparedBrakeModule::new(
+        brake_dac,
+        brake_pins,
+        brake_pedal_position_sensor,
+        brake_grounded_fault_timer,
+        brake_override_fault_timer,
+    );
+    let unprepared_throttle_module = UnpreparedThrottleModule::new(
+        accelerator_position_sensor,
+        throttle_dac,
+        throttle_pins,
+        throttle_grounded_fault_timer,
+        throttle_override_fault_timer,
+    );
+    let unprepared_steering_module = UnpreparedSteeringModule::new(
+        torque_sensor,
+        steering_dac,
+        steering_pins,
+        steering_grounded_fault_timer,
+    );
     let mut can_gateway = CanGatewayModule::new(can_publish_timer, control_can, obd_can);
 
     let mut modules = ControlModules {
@@ -185,12 +201,7 @@ fn main() -> ! {
         // NOTE
         // ignoring transmit timeouts until a proper error handling strategy is
         // implemented
-        if let Err(e) = check_for_faults(
-            &mut modules,
-            &mut can_gateway,
-            &timer_ms,
-            &mut debug_console,
-        ) {
+        if let Err(e) = check_for_faults(&mut modules, &mut can_gateway, &mut debug_console) {
             if e != OxccError::Can(CanError::Timeout) {
                 handle_error(
                     e,
@@ -269,20 +280,19 @@ fn process_control_can_frames(
 fn check_for_faults(
     modules: &mut ControlModules,
     can_gateway: &mut CanGatewayModule,
-    timer_ms: &MsTimer,
     debug_console: &mut DebugConsole,
 ) -> Result<(), OxccError> {
-    let maybe_fault = modules.brake.check_for_faults(timer_ms, debug_console)?;
+    let maybe_fault = modules.brake.check_for_faults(debug_console)?;
     if let Some(brake_fault) = maybe_fault {
         can_gateway.publish_fault_report(brake_fault)?;
     }
 
-    let maybe_fault = modules.throttle.check_for_faults(timer_ms, debug_console)?;
+    let maybe_fault = modules.throttle.check_for_faults(debug_console)?;
     if let Some(throttle_fault) = maybe_fault {
         can_gateway.publish_fault_report(throttle_fault)?;
     }
 
-    let maybe_fault = modules.steering.check_for_faults(timer_ms, debug_console)?;
+    let maybe_fault = modules.steering.check_for_faults(debug_console)?;
     if let Some(steering_fault) = maybe_fault {
         can_gateway.publish_fault_report(steering_fault)?;
     }

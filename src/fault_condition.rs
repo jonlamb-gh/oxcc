@@ -2,27 +2,28 @@
 // https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.h#L19
 
 use dual_signal::{DualSignal, HighLowReader};
-use ms_timer::MsTimer;
+use embedded_hal::timer::CountDown;
+use nucleo_f767zi::hal::timer::OnePulse;
 
-pub struct FaultCondition {
+pub struct FaultCondition<TIMER> {
     monitoring_active: bool,
-    condition_start_time: u32,
+    timer: TIMER,
 }
 
-impl FaultCondition {
-    pub const fn new() -> Self {
+impl<TIMER> FaultCondition<TIMER>
+where
+    TIMER: CountDown + OnePulse,
+{
+    pub fn new(mut timer: TIMER) -> Self {
+        timer.reconfigure_one_pulse_mode();
+
         FaultCondition {
             monitoring_active: false,
-            condition_start_time: 0,
+            timer,
         }
     }
 
-    pub fn condition_exceeded_duration(
-        &mut self,
-        condition_active: bool,
-        max_duration: u32,
-        timer_ms: &MsTimer,
-    ) -> bool {
+    pub fn condition_exceeded_duration(&mut self, condition_active: bool) -> bool {
         let mut faulted = false;
 
         if !condition_active {
@@ -31,42 +32,31 @@ impl FaultCondition {
              * the condition active flag and reset the last detection time.
              */
             self.monitoring_active = false;
-            self.condition_start_time = 0;
         } else {
-            let now = timer_ms.ms();
-
             if !self.monitoring_active {
                 /* We just detected a condition that may lead to a fault. Update
                  * the state to track that the condition is active and store the
                  * first time of detection.
                  */
                 self.monitoring_active = true;
-                self.condition_start_time = now;
+                self.timer.reset();
             }
 
-            // TODO - need to fix this ported logic
-            // panicked at 'attempt to subtract with overflow', src/fault_condition.rs:47:28
-            let duration = now - self.condition_start_time;
-
-            if duration >= max_duration {
+            if self.timer.wait().is_ok() {
                 /* The fault condition has been active for longer than the maximum
                  * acceptable duration.
                  */
                 faulted = true;
+                self.timer.reset();
             }
         }
 
         faulted
     }
 
-    pub fn check_voltage_grounded<T: HighLowReader>(
-        &mut self,
-        signal: &DualSignal<T>,
-        max_duration: u32,
-        timer_ms: &MsTimer,
-    ) -> bool {
+    pub fn check_voltage_grounded<T: HighLowReader>(&mut self, signal: &DualSignal<T>) -> bool {
         let condition_active = (signal.high() == 0) || (signal.low() == 0);
 
-        self.condition_exceeded_duration(condition_active, max_duration, timer_ms)
+        self.condition_exceeded_duration(condition_active)
     }
 }

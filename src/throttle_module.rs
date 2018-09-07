@@ -7,7 +7,6 @@ use dtc::DtcBitfield;
 use dual_signal::DualSignal;
 use fault_can_protocol::*;
 use fault_condition::FaultCondition;
-use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::can::CanFrame;
 use nucleo_f767zi::hal::prelude::*;
@@ -41,8 +40,8 @@ where
 pub struct ThrottleModule {
     accelerator_position: DualSignal<AcceleratorPositionSensor>,
     control_state: ThrottleControlState<u8>,
-    grounded_fault_state: FaultCondition,
-    operator_override_state: FaultCondition,
+    grounded_fault_state: FaultCondition<ThrottleGroundedFaultTimer>,
+    operator_override_state: FaultCondition<ThrottleOverrideFaultTimer>,
     throttle_report: OsccThrottleReport,
     fault_report: OsccFaultReport,
     throttle_dac: ThrottleDac,
@@ -58,13 +57,15 @@ impl UnpreparedThrottleModule {
         accelerator_position_sensor: AcceleratorPositionSensor,
         throttle_dac: ThrottleDac,
         throttle_pins: ThrottlePins,
+        grounded_fault_timer: ThrottleGroundedFaultTimer,
+        override_timer: ThrottleOverrideFaultTimer,
     ) -> UnpreparedThrottleModule {
         UnpreparedThrottleModule {
             throttle_module: ThrottleModule {
                 accelerator_position: DualSignal::new(0, 0, accelerator_position_sensor),
                 control_state: ThrottleControlState::new(u8::default()),
-                grounded_fault_state: FaultCondition::new(),
-                operator_override_state: FaultCondition::new(),
+                grounded_fault_state: FaultCondition::new(grounded_fault_timer),
+                operator_override_state: FaultCondition::new(override_timer),
                 throttle_report: OsccThrottleReport::new(),
                 fault_report: OsccFaultReport {
                     fault_origin_id: FAULT_ORIGIN_THROTTLE,
@@ -149,7 +150,6 @@ impl ThrottleModule {
     /// Checks for any fresh (previously undetected or unhandled) faults
     pub fn check_for_faults(
         &mut self,
-        timer_ms: &MsTimer,
         debug_console: &mut DebugConsole,
     ) -> Result<Option<&OsccFaultReport>, OxccError> {
         if !self.control_state.enabled && !self.control_state.dtcs.are_any_set() {
@@ -165,15 +165,11 @@ impl ThrottleModule {
 
         let operator_overridden: bool = self.operator_override_state.condition_exceeded_duration(
             accelerator_position_average >= ACCELERATOR_OVERRIDE_THRESHOLD,
-            FAULT_HYSTERESIS,
-            timer_ms,
         );
 
-        let inputs_grounded: bool = self.grounded_fault_state.check_voltage_grounded(
-            &self.accelerator_position,
-            FAULT_HYSTERESIS,
-            timer_ms,
-        );
+        let inputs_grounded: bool = self
+            .grounded_fault_state
+            .check_voltage_grounded(&self.accelerator_position);
 
         // sensor pins tied to ground - a value of zero indicates disconnection
         if inputs_grounded {

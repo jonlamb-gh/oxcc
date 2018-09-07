@@ -6,7 +6,9 @@ use nucleo_f767zi::hal::gpio::gpioc::{PC10, PC11, PC12, PC2};
 use nucleo_f767zi::hal::gpio::gpiod::{PD0, PD1, PD10, PD11, PD12, PD13};
 use nucleo_f767zi::hal::gpio::{Output, PushPull, AF5, AF9};
 use nucleo_f767zi::hal::spi::Spi;
-use nucleo_f767zi::hal::stm32f7x7::{CAN1, CAN2, SPI1, SPI2, SPI3, TIM2};
+use nucleo_f767zi::hal::stm32f7x7::{
+    CAN1, CAN2, SPI1, SPI2, SPI3, TIM2, TIM3, TIM4, TIM5, TIM6, TIM7,
+};
 use nucleo_f767zi::hal::timer::Timer;
 use nucleo_f767zi::{
     AnalogInput0Pin, AnalogInput1Pin, AnalogInput2Pin, AnalogInput4Pin, AnalogInput5Pin,
@@ -14,6 +16,11 @@ use nucleo_f767zi::{
 };
 
 pub type CanPublishTimer = Timer<TIM2>;
+pub type BrakeGroundedFaultTimer = Timer<TIM3>;
+pub type BrakeOverrideFaultTimer = Timer<TIM4>;
+pub type ThrottleGroundedFaultTimer = Timer<TIM5>;
+pub type ThrottleOverrideFaultTimer = Timer<TIM6>;
+pub type SteeringGroundedFaultTimer = Timer<TIM7>;
 
 pub type ControlCan = Can<CAN1, (PD1<AF9>, PD0<AF9>)>;
 pub type ObdCan = Can<CAN2, (PB13<AF9>, PB12<AF9>)>;

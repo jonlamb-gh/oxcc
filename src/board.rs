@@ -3,7 +3,6 @@ use cortex_m;
 use dac_mcp4922::Mcp4922;
 use dac_mcp4922::MODE as DAC_MODE;
 use dual_signal::HighLowReader;
-use ms_timer::MsTimer;
 use nucleo_f767zi::debug_console::DebugConsole;
 use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcPrescaler, AdcSampleTime};
 use nucleo_f767zi::hal::can::Can;
@@ -16,6 +15,7 @@ use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, IWDG};
 use nucleo_f767zi::led::{Color, Leds};
 use nucleo_f767zi::UserButtonPin;
+use vehicle::FAULT_HYSTERESIS;
 
 pub use types::*;
 
@@ -50,7 +50,6 @@ pub struct FullBoard {
     pub debug_console: DebugConsole,
     pub leds: Leds,
     pub user_button: UserButtonPin,
-    pub timer_ms: MsTimer,
     pub can_publish_timer: CanPublishTimer,
     pub wdg: Iwdg<IWDG>,
     pub reset_conditions: ResetConditions,
@@ -65,6 +64,11 @@ pub struct FullBoard {
     brake_pins: BrakePins,
     throttle_pins: ThrottlePins,
     steering_pins: SteeringPins,
+    brake_grounded_fault_timer: BrakeGroundedFaultTimer,
+    brake_override_fault_timer: BrakeOverrideFaultTimer,
+    throttle_grounded_fault_timer: ThrottleGroundedFaultTimer,
+    throttle_override_fault_timer: ThrottleOverrideFaultTimer,
+    steering_grounded_fault_timer: SteeringGroundedFaultTimer,
 }
 
 pub struct Board {
@@ -192,13 +196,6 @@ impl FullBoard {
         // configure maximum clock frequency at 200 MHz
         let clocks = rcc.cfgr.freeze_max(&mut flash.acr);
 
-        // TODO - use the safe APIs once this block solidifies
-        unsafe {
-            // TODO - move this constant into BSP crate?
-            // unlock registers to enable DWT cycle counter for MsTimer
-            core_peripherals.DWT.lar.write(0xC5AC_CE55);
-        }
-
         let mut leds = Leds::new(led_r, led_g, led_b);
         for led in leds.iter_mut() {
             led.off();
@@ -280,7 +277,6 @@ impl FullBoard {
             user_button: gpioc
                 .pc13
                 .into_pull_down_input(&mut gpioc.moder, &mut gpioc.pupdr),
-            timer_ms: MsTimer::new(core_peripherals.DWT, clocks),
             can_publish_timer: CanPublishTimer::tim2(
                 peripherals.TIM2,
                 CAN_PUBLISH_HZ.hz(),
@@ -309,6 +305,36 @@ impl FullBoard {
             brake_pins,
             throttle_pins,
             steering_pins,
+            brake_grounded_fault_timer: BrakeGroundedFaultTimer::tim3(
+                peripherals.TIM3,
+                (1000 / FAULT_HYSTERESIS).hz(),
+                clocks,
+                &mut rcc.apb1,
+            ),
+            brake_override_fault_timer: BrakeOverrideFaultTimer::tim4(
+                peripherals.TIM4,
+                (1000 / FAULT_HYSTERESIS).hz(),
+                clocks,
+                &mut rcc.apb1,
+            ),
+            throttle_grounded_fault_timer: ThrottleGroundedFaultTimer::tim5(
+                peripherals.TIM5,
+                (1000 / FAULT_HYSTERESIS).hz(),
+                clocks,
+                &mut rcc.apb1,
+            ),
+            throttle_override_fault_timer: ThrottleOverrideFaultTimer::tim6(
+                peripherals.TIM6,
+                (1000 / FAULT_HYSTERESIS).hz(),
+                clocks,
+                &mut rcc.apb1,
+            ),
+            steering_grounded_fault_timer: SteeringGroundedFaultTimer::tim7(
+                peripherals.TIM7,
+                (1000 / FAULT_HYSTERESIS).hz(),
+                clocks,
+                &mut rcc.apb1,
+            ),
         }
     }
 
@@ -319,13 +345,17 @@ impl FullBoard {
         BrakeDac,
         BrakePins,
         BrakePedalPositionSensor,
+        BrakeGroundedFaultTimer,
+        BrakeOverrideFaultTimer,
         AcceleratorPositionSensor,
         ThrottleDac,
         ThrottlePins,
+        ThrottleGroundedFaultTimer,
+        ThrottleOverrideFaultTimer,
         TorqueSensor,
         SteeringDac,
         SteeringPins,
-        MsTimer,
+        SteeringGroundedFaultTimer,
         DebugConsole,
         CanPublishTimer,
         ControlCan,
@@ -335,7 +365,6 @@ impl FullBoard {
             debug_console,
             leds,
             user_button,
-            timer_ms,
             can_publish_timer,
             wdg,
             reset_conditions,
@@ -350,6 +379,11 @@ impl FullBoard {
             brake_pins,
             throttle_pins,
             steering_pins,
+            brake_grounded_fault_timer,
+            brake_override_fault_timer,
+            throttle_grounded_fault_timer,
+            throttle_override_fault_timer,
+            steering_grounded_fault_timer,
         } = self;
         (
             Board {
@@ -361,13 +395,17 @@ impl FullBoard {
             brake_dac,
             brake_pins,
             brake_pedal_position_sensor,
+            brake_grounded_fault_timer,
+            brake_override_fault_timer,
             accelerator_position_sensor,
             throttle_dac,
             throttle_pins,
+            throttle_grounded_fault_timer,
+            throttle_override_fault_timer,
             torque_sensor,
             steering_dac,
             steering_pins,
-            timer_ms,
+            steering_grounded_fault_timer,
             debug_console,
             can_publish_timer,
             control_can,
