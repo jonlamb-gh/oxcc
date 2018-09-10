@@ -11,12 +11,6 @@ cargo install --force rustfmt-nightly
 rustup target add thumbv7em-none-eabihf
 
 cargo install svd2rust
-
-# currently used for linking
-# TODO - switch over to lld
-sudo add-apt-repository ppa:team-gcc-arm-embedded/ppa
-sudo apt update
-sudo apt install gcc-arm-embedded
 ```
 
 ```bash
@@ -24,6 +18,8 @@ cargo build
 ```
 
 ## Deploying
+
+Install [stlink](https://github.com/texane/stlink) tools.
 
 ```bash
 ./scripts/deploy
@@ -38,6 +34,12 @@ st-flash --format ihex write target/thumbv7em-none-eabihf/debug/oxcc.hex
 ```
 
 ## Debugging
+
+Install OpenOCD:
+
+```bash
+sudo apt-get install openocd
+```
 
 ```bash
 ./scripts/run-openocd
