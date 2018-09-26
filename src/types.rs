@@ -3,7 +3,8 @@ use nucleo_f767zi::hal::can::Can;
 use nucleo_f767zi::hal::gpio::gpioa::{PA15, PA4, PA5, PA6, PA7};
 use nucleo_f767zi::hal::gpio::gpiob::{PB10, PB12, PB13, PB15, PB4};
 use nucleo_f767zi::hal::gpio::gpioc::{PC10, PC11, PC12, PC2};
-use nucleo_f767zi::hal::gpio::gpiod::{PD0, PD1, PD10, PD11, PD12, PD13};
+use nucleo_f767zi::hal::gpio::gpiod::{PD0, PD1, PD11, PD12, PD13};
+use nucleo_f767zi::hal::gpio::gpioe::PE2;
 use nucleo_f767zi::hal::gpio::{Output, PushPull, AF5, AF9};
 use nucleo_f767zi::hal::spi::Spi;
 use nucleo_f767zi::hal::stm32f7x7::{
@@ -41,7 +42,7 @@ pub type BrakeSpiNssPin = PA4<Output<PushPull>>;
 
 pub type BrakeDac = Mcp4922<BrakeSpi, BrakeSpiNssPin>;
 
-pub type ThrottleSpoofEnablePin = PD10<Output<PushPull>>;
+pub type ThrottleSpoofEnablePin = PE2<Output<PushPull>>;
 // AIN pins chosen to allow throttle module to own ADC2
 pub type AcceleratorPositionSensorHighPin = AnalogInput2Pin;
 pub type AcceleratorPositionSensorLowPin = AnalogInput6Pin;

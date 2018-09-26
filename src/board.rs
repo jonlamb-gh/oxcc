@@ -101,6 +101,7 @@ impl FullBoard {
         let mut gpioa = peripherals.GPIOA.split(&mut rcc.ahb1);
         let mut gpioc = peripherals.GPIOC.split(&mut rcc.ahb1);
         let mut gpiod = peripherals.GPIOD.split(&mut rcc.ahb1);
+        let mut gpioe = peripherals.GPIOE.split(&mut rcc.ahb1);
         let mut gpiof = peripherals.GPIOF.split(&mut rcc.ahb1);
 
         let brake_pins = BrakePins {
@@ -127,9 +128,9 @@ impl FullBoard {
             .into_push_pull_output(&mut gpioa.moder, &mut gpioa.otyper);
 
         let throttle_pins = ThrottlePins {
-            spoof_enable: gpiod
-                .pd10
-                .into_push_pull_output(&mut gpiod.moder, &mut gpiod.otyper),
+            spoof_enable: gpioe
+                .pe2
+                .into_push_pull_output(&mut gpioe.moder, &mut gpioe.otyper),
             accel_pos_sensor_high: gpioc
                 .pc3
                 .into_analog_input(&mut gpioc.moder, &mut gpioc.pupdr),
