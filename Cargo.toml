@@ -1,7 +1,16 @@
 [package]
 name = "oxcc"
-version = "0.0.1"
-authors = ["jonlamb-gh <lamb.jon.io@gmail.com>"]
+version = "0.1.0"
+authors = [
+    "Jon Lamb <lamb.jon.io@gmail.com>",
+    "Zachary Pierce <zachary.pierce@gmail.com>",
+    "Russell Mull <russell@digitalartificer.com>"
+]
+categories = ["embedded", "hardware-support", "no-std"]
+description = "A port of Open Source Car Control written in Rust"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/jonlamb-gh/oxcc"
 
 [dependencies.panic-abort]
 version = "0.3.1"
@@ -45,12 +54,12 @@ default-features = false
 codegen-units = 1 # better optimizations
 lto = true # better optimizations
 
-# TODO - should this live in the BSP crate?
-# panic-over-serial = []
 [features]
-default = ["kia-soul-ev", "panic-over-semihosting"]
+default = ["kia-soul-ev", "panic-over-abort"]
 kia-soul-ev = []
-kia-soul-petrol = []
 kia-niro = []
+# No plans to support the Petrol, however it is stubbed out for use
+kia-soul-petrol = []
+# Panic stategies
 panic-over-semihosting = ["cortex-m-semihosting", "panic-semihosting"]
 panic-over-abort = ["panic-abort"]

@@ -4,9 +4,9 @@ set -e
 
 arm-none-eabi-objcopy \
     -O ihex \
-    target/thumbv7em-none-eabihf/debug/oxcc \
-    target/thumbv7em-none-eabihf/debug/oxcc.hex
+    target/thumbv7em-none-eabihf/release/oxcc \
+    target/thumbv7em-none-eabihf/release/oxcc.hex
 
-st-flash --format ihex write target/thumbv7em-none-eabihf/debug/oxcc.hex
+st-flash --format ihex write target/thumbv7em-none-eabihf/release/oxcc.hex
 
 exit 0
