@@ -3,10 +3,7 @@ MEMORY
     /* NOTE K = KiBi = 1024 bytes */
 
     /* STM32F767ZI 2 MByte FLASH, 512 KByte RAM */
-    /* FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 2048K */
-
-    /* Using OxCC bootloader, user firmware starts at 0x0802_0000 */
-    FLASH (rx) : ORIGIN = 0x08020000, LENGTH = (2048K - 128K)
+    FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 2048K
     /* First 8 bytes are reserved for the bootloader sticky flag word */
     RAM (xrw)  : ORIGIN = 0x20000008, LENGTH = (512K - 8)
 }

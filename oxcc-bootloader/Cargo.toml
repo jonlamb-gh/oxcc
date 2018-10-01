@@ -1,0 +1,48 @@
+# The main binary application is the bootloader firmware
+[package]
+name = "oxcc-bootloader"
+version = "0.1.0"
+authors = ["Jon Lamb"]
+
+# Provides an interface for user firmware to reset into the bootloader
+[lib]
+name = "oxcc_bootloader_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "oxcc-bootloader"
+path = "src/main.rs"
+
+[dependencies]
+cortex-m = "0.5.7"
+cortex-m-rt = "0.6.3"
+# switching over to semihosting can be useful for debugging
+#panic-semihosting = "0.4.0"
+panic-abort = "0.3.1"
+cortex-m-semihosting = "0.3.1"
+byteorder = { version = "1.2.2", default-features = false }
+
+[dependencies.smoltcp]
+git = "https://github.com/m-labs/smoltcp"
+rev = "21396867114d267da06f19cc54cc4a1883b900a5"
+default-features = false
+features = ["proto-ipv4", "socket-tcp"]
+
+[dependencies.stm32f7]
+git = "https://github.com/jonlamb-gh/stm32-rs.git"
+branch = "stm32f767zit6-patches"
+version = "0.2.2"
+features = ["stm32f7x7", "rt"]
+
+[build-dependencies]
+built = "0.3.0"
+
+[profile.dev]
+codegen-units = 1
+incremental = false
+
+[profile.release]
+debug = true
+lto = true
+codegen-units = 1
+incremental = false

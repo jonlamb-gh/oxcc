@@ -15,6 +15,7 @@ extern crate panic_abort;
 extern crate panic_semihosting;
 #[macro_use]
 extern crate typenum;
+extern crate oxcc_bootloader_lib;
 
 mod board;
 mod can_gateway_module;
@@ -23,12 +24,15 @@ mod dac_mcp4922;
 mod dtc;
 mod dual_signal;
 mod fault_condition;
+mod fw_update;
 mod oxcc_error;
 mod ranges;
 mod steering_module;
 mod throttle_module;
 mod types;
 
+#[path = "can_protocols/bootloader_can_protocol.rs"]
+mod bootloader_can_protocol;
 #[path = "can_protocols/brake_can_protocol.rs"]
 mod brake_can_protocol;
 #[path = "can_protocols/fault_can_protocol.rs"]
@@ -118,6 +122,7 @@ fn main() -> ! {
         writeln!(debug_console, "OxCC is running").unwrap();
 
         // TODO - some of these are worthy of disabling controls?
+        // NOTE - these are currently cleared when using the fota-bootloader
         if board.reset_conditions.low_power {
             writeln!(debug_console, "WARNING: low-power reset detected")
                 .expect(DEBUG_WRITE_FAILURE);
@@ -262,6 +267,9 @@ fn process_control_can_frames(
                 modules
                     .steering
                     .process_rx_frame(&rx_frame, debug_console)?;
+
+                // process any firmware-update/bootloader frames
+                fw_update::process_rx_frame(&rx_frame)?;
             }
             Err(e) => {
                 // report all but BufferExhausted (no data)
