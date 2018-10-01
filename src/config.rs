@@ -1,3 +1,4 @@
+use bootloader_can_protocol::*;
 use brake_can_protocol::*;
 use fault_can_protocol::*;
 use nucleo_f767zi::hal::can::{
@@ -77,6 +78,7 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     f1.filter_id_high = 0;
 
     // filter 2 stores the enable control IDs for brake, throttle, and steering
+    // and the bootloader reset command ID
     // FIFO_1
     let mut f2 = CanFilterConfig::default();
     f2.filter_number = 2;
@@ -87,7 +89,7 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     f2.filter_mask_id_low = u32::from(OSCC_BRAKE_ENABLE_CAN_ID << 5);
     f2.filter_id_low = u32::from(OSCC_THROTTLE_ENABLE_CAN_ID << 5);
     f2.filter_mask_id_high = u32::from(OSCC_STEERING_ENABLE_CAN_ID << 5);
-    f2.filter_id_high = 0;
+    f2.filter_id_high = u32::from(OSCC_BOOTLOADER_RESET_CAN_ID << 5);
 
     [f0, f1, f2]
 }

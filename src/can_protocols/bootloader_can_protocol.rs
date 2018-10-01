@@ -1,0 +1,3 @@
+pub const OSCC_BOOTLOADER_RESET_CAN_ID: u16 = 0xF0;
+
+pub const OSCC_BOOTLOADER_RESET_CAN_DLC: u8 = 8;

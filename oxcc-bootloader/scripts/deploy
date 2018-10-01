@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+
+arm-none-eabi-objcopy \
+    -O ihex \
+    target/thumbv7em-none-eabihf/release/oxcc-bootloader \
+    target/thumbv7em-none-eabihf/release/oxcc-bootloader.hex
+
+st-flash --format ihex write target/thumbv7em-none-eabihf/release/oxcc-bootloader.hex
+
+exit 0

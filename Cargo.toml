@@ -12,6 +12,10 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/jonlamb-gh/oxcc"
 
+[dependencies.oxcc-bootloader]
+path = "oxcc-bootloader/"
+version = "0.1.0"
+
 [dependencies.panic-abort]
 version = "0.3.1"
 optional = true
