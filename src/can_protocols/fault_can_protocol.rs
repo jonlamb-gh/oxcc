@@ -1,3 +1,5 @@
+//! Fault CAN protocol
+
 use nucleo_f767zi::hal::can::{BaseID, CanError, DataFrame, ID};
 
 pub const OSCC_FAULT_REPORT_CAN_ID: u16 = 0xAF;

@@ -1,5 +1,4 @@
-// https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.cpp
-// https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/fault_check/oscc_check.h#L19
+//! Fault condition
 
 use dual_signal::{DualSignal, HighLowReader};
 use embedded_hal::timer::CountDown;
@@ -27,25 +26,21 @@ where
         let mut faulted = false;
 
         if !condition_active {
-            /*
-             * If a fault condition is not active, update the state to clear
-             * the condition active flag and reset the last detection time.
-             */
+            // If a fault condition is not active, update the state to clear
+            // the condition active flag and reset the last detection time.
             self.monitoring_active = false;
         } else {
             if !self.monitoring_active {
-                /* We just detected a condition that may lead to a fault. Update
-                 * the state to track that the condition is active and store the
-                 * first time of detection.
-                 */
+                // We just detected a condition that may lead to a fault. Update
+                // the state to track that the condition is active and store the
+                // first time of detection.
                 self.monitoring_active = true;
                 self.timer.reset();
             }
 
             if self.timer.wait().is_ok() {
-                /* The fault condition has been active for longer than the maximum
-                 * acceptable duration.
-                 */
+                // The fault condition has been active for longer than the maximum
+                // acceptable duration.
                 faulted = true;
                 self.timer.reset();
             }

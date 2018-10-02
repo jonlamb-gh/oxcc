@@ -1,4 +1,4 @@
-// https://github.com/jonlamb-gh/oscc/tree/devel/firmware/steering
+//! Steering module
 
 use board::TorqueSensor;
 use core::fmt::Write;
@@ -39,6 +39,7 @@ where
     }
 }
 
+/// Steering module
 pub struct SteeringModule {
     steering_torque: DualSignal<TorqueSensor>,
     control_state: SteeringControlState<u8>,

@@ -131,7 +131,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "oxcc"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "cortex-m 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "cortex-m-rt 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,3 +1,5 @@
+//! Dual signal
+
 use board::DAC_SAMPLE_AVERAGE_COUNT;
 use num;
 

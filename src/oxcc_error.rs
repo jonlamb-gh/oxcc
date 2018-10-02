@@ -1,4 +1,4 @@
-// might make more sense to just use the existing HAL errors?
+//! OxCC error type
 
 use nucleo_f767zi::hal::can::CanError;
 use nucleo_f767zi::hal::spi;

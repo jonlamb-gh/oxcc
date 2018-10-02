@@ -1,3 +1,5 @@
+//! OxCC configuration data
+
 use brake_can_protocol::*;
 use fault_can_protocol::*;
 use nucleo_f767zi::hal::can::{
@@ -7,6 +9,7 @@ use steering_can_protocol::*;
 use throttle_can_protocol::*;
 use vehicle::*;
 
+/// Control CAN interface configuration
 pub const CONTROL_CAN_CONFIG: CanConfig = CanConfig {
     loopback_mode: false,
     silent_mode: false,
@@ -17,7 +20,7 @@ pub const CONTROL_CAN_CONFIG: CanConfig = CanConfig {
     rflm: false,
     txfp: false,
     // TODO - update CAN impl to calculate these
-    // 500K with 216 MHz system clock /= 4 = 54 MHz pclk1
+    /// Control CAN bus is configured for 500K
     bit_timing: CanBitTiming {
         prescaler: 5, // 6
         sjw: 0,       // CAN_SJW_1TQ
@@ -26,6 +29,7 @@ pub const CONTROL_CAN_CONFIG: CanConfig = CanConfig {
     },
 };
 
+/// Vehicle OBD CAN interface configuration
 pub const OBD_CAN_CONFIG: CanConfig = CanConfig {
     loopback_mode: false,
     silent_mode: false,
@@ -35,7 +39,7 @@ pub const OBD_CAN_CONFIG: CanConfig = CanConfig {
     nart: false,
     rflm: false,
     txfp: false,
-    // 500K with 216 MHz system clock /= 4 = 54 MHz pclk1
+    /// OBD CAN bus is configured for 500K
     bit_timing: CanBitTiming {
         prescaler: 5, // 6
         sjw: 0,       // CAN_SJW_1TQ
@@ -44,14 +48,16 @@ pub const OBD_CAN_CONFIG: CanConfig = CanConfig {
     },
 };
 
-// TODO - docs on priority ordering in ID list mode
-// can we make a pub type instead?
-// CanFilterConfig { enabled: true, ..Default::default() }
+/// Gather the Control CAN filter configurations
+///
+/// Since we're only interrested in a small number of messages,
+/// we can use ID list mode instead of masking.
+/// Only the specific message IDs are allowed through the filter.
+/// Filter 0 is the highest priority filter, followed by filter 1, etc.
 pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
-    // filter 0 is the highest priority filter in ID list mode
-    // it stores the disable control IDs for throttle, brake, steering
-    // and the fault report ID
-    // FIFO_0
+    // Filter 0, bound to FIFO_0
+    //  - disable control IDs for throttle, brake, steering
+    //  - fault report ID
     let mut f0 = CanFilterConfig::default();
     f0.filter_number = 0;
     f0.enabled = true;
@@ -63,8 +69,8 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     f0.filter_mask_id_high = u32::from(OSCC_STEERING_DISABLE_CAN_ID << 5);
     f0.filter_id_high = u32::from(OSCC_FAULT_REPORT_CAN_ID << 5);
 
-    // filter 1 stores the control command IDs for brake, throttle, and steering
-    // FIFO_1
+    // Filter 1, bound to FIFO_1
+    // - control command IDs for brake, throttle, and steering
     let mut f1 = CanFilterConfig::default();
     f1.filter_number = 1;
     f1.enabled = true;
@@ -76,8 +82,8 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     f1.filter_mask_id_high = u32::from(OSCC_STEERING_COMMAND_CAN_ID << 5);
     f1.filter_id_high = 0;
 
-    // filter 2 stores the enable control IDs for brake, throttle, and steering
-    // FIFO_1
+    // filter 2, bound to FIFO_1
+    // - enable control IDs for brake, throttle, and steering
     let mut f2 = CanFilterConfig::default();
     f2.filter_number = 2;
     f2.enabled = true;
@@ -92,10 +98,21 @@ pub fn gather_control_can_filters() -> [CanFilterConfig; 3] {
     [f0, f1, f2]
 }
 
+/// Gather the vehicle OBD CAN filter configurations
+///
+/// **NOTE**
+/// Vehicle OBD CAN is on CAN2 which shares a configuration
+/// peripheral with CAN1 (see notes on bxCAN). The split is 50/50, so
+/// CAN1 gets the first 0:13 filters and CAN2 gets the remaining 14:27
+/// filters. This is why the filter numbers here start at 14.
+///
+/// Since we're only interrested in a small number of messages,
+/// we can use ID list mode instead of masking.
+/// Only the specific message IDs are allowed through the filter.
+/// Filter 0 is the highest priority filter, followed by filter 1, etc.
 pub fn gather_obd_can_filters() -> [CanFilterConfig; 1] {
-    // filter 14 stores the 4 OBD IDs
-    // bank 14 means CAN2 treats this as the first filter
-    // FIFO_0
+    // filter 14, bound to FIFO_0
+    // - the 4 OBD IDs
     let mut f3 = CanFilterConfig::default();
     f3.filter_number = 14;
     f3.bank_number = 14;

@@ -1,4 +1,4 @@
-// https://github.com/jonlamb-gh/oscc/tree/devel/firmware/can_gateway
+//! CAN gateway module
 
 use brake_can_protocol::*;
 use fault_can_protocol::*;
