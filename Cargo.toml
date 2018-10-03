@@ -32,10 +32,8 @@ features = ["const-fn"]
 version = "0.6.3"
 features = ["device"]
 
-[dependencies.nucleo-f767zi]
-version = "0.0.1"
-git = "https://github.com/jonlamb-gh/nucleo-f767zi.git"
-branch = "master"
+[dependencies.oxcc-nucleo-f767zi]
+version = "0.1.0"
 features = ["rt"]
 
 [dependencies.num]
