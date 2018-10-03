@@ -1,4 +1,4 @@
-// https://github.com/jonlamb-gh/oscc/tree/devel/firmware/throttle
+//! Throttle module
 
 use board::AcceleratorPositionSensor;
 use core::fmt::Write;
@@ -37,6 +37,7 @@ where
     }
 }
 
+/// Throttle module
 pub struct ThrottleModule {
     accelerator_position: DualSignal<AcceleratorPositionSensor>,
     control_state: ThrottleControlState<u8>,

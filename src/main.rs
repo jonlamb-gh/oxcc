@@ -1,3 +1,7 @@
+//! OxCC
+//!
+//! A port of Open Source Car Control written in Rust.
+
 #![no_std]
 #![no_main]
 #![feature(const_fn)]
@@ -77,6 +81,7 @@ use throttle_module::{ThrottleModule, UnpreparedThrottleModule};
 
 const DEBUG_WRITE_FAILURE: &str = "Failed to write to debug_console";
 
+/// A local container for passing around the control modules
 struct ControlModules {
     pub brake: BrakeModule,
     pub throttle: ThrottleModule,

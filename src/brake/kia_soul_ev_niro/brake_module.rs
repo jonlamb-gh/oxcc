@@ -1,4 +1,4 @@
-// https://github.com/jonlamb-gh/oscc/tree/devel/firmware/brake/kia_soul_ev_niro
+//! Kia Soul EV/Niro brake module
 
 use super::types::*;
 use board::BrakePedalPositionSensor;
@@ -37,6 +37,7 @@ where
     }
 }
 
+/// Brake module
 pub struct BrakeModule {
     brake_pedal_position: DualSignal<BrakePedalPositionSensor>,
     control_state: BrakeControlState<u8>,

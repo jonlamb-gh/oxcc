@@ -1,8 +1,15 @@
-// TODO
-// - latching
-// - gain
-// - buffer vref
-// - other errors?
+//! A driver to interface with the MCP4922 (12-bit, dual channel DAC)
+//!
+//! This driver was built using [`embedded-hal`] traits.
+//!
+//! This is a minimal port of the Arduino implementation
+//! used in OSCC. You can find the original source here:
+//! https://github.com/jonlamb-gh/oscc/blob/master/firmware/common/libs/DAC_MCP49xx/README.txt
+//!
+//! Features that don't exist:
+//! - latching
+//! - gain configuration
+//! - reference voltage configuration
 
 use embedded_hal::blocking::spi::Write;
 use embedded_hal::digital::OutputPin;
@@ -22,12 +29,14 @@ pub const MODE: Mode = Mode {
     polarity: Polarity::IdleLow,
 };
 
+/// DAC Channel
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Channel {
     ChannelA,
     ChannelB,
 }
 
+/// DAC Errors
 #[derive(Debug)]
 pub enum Error<E> {
     /// SPI error
@@ -40,6 +49,7 @@ impl<E> From<E> for Error<E> {
     }
 }
 
+/// MCP4922 driver
 pub struct Mcp4922<SPI, CS> {
     spi: SPI,
     cs: CS,
@@ -50,6 +60,7 @@ where
     SPI: Write<u8, Error = E>,
     CS: OutputPin,
 {
+    /// Creates a new driver from a SPI peripheral and a CS pin
     pub fn new(spi: SPI, mut cs: CS) -> Self {
         // unselect the device
         cs.set_high();
@@ -57,12 +68,13 @@ where
         Mcp4922 { spi, cs }
     }
 
+    /// Writes the two output values to the two output channels of the DAC
     pub fn output_ab(&mut self, output_a: DacOutput, output_b: DacOutput) -> Result<(), E> {
-        // TODO latching?
         self.output(output_a, Channel::ChannelA)?;
         self.output(output_b, Channel::ChannelB)
     }
 
+    /// Writes a bounded 16-bit value `data` to the output `channel` of the DAC
     pub fn output(&mut self, data: DacOutput, channel: Channel) -> Result<(), E> {
         self.cs.set_low();
 

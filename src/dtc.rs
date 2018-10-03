@@ -1,3 +1,5 @@
+//! Diagnostic trouble codes
+
 pub trait DtcBitfield {
     fn set(&mut self, dtc: u8);
     fn clear(&mut self, dtc: u8);

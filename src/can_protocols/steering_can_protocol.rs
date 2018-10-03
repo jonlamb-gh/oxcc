@@ -1,3 +1,5 @@
+//! Steering CAN protocol
+
 use nucleo_f767zi::hal::can::{BaseID, CanError, DataFrame, ID};
 
 pub const OSCC_STEERING_ENABLE_CAN_ID: u16 = 0x80;

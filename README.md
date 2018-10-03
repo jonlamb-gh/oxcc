@@ -18,6 +18,8 @@ Apart from the change in MCU/board, `OxCC` combines all of the OSCC modules (thr
 
 #### Hardware
 
+A new layout and schematic is currently in the works, check out the rough [pinout](https://jonlamb-gh.github.io/oxcc/nucleo-144-oxcc-pins.png) to get started.
+
 * CAN
 
   `OxCC` uses the stm's on-board bxCAN controller.
@@ -65,7 +67,7 @@ See the `[features]` section of the [Cargo.toml](Cargo.toml) to change configura
   cargo build
   ```
 
-### Deploying
+## Deploying
 
 Deploy the firmware Using `st-flash` (provided by `stlink`):
 

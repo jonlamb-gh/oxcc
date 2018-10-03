@@ -1,3 +1,5 @@
+//! OxCC types
+
 use dac_mcp4922::Mcp4922;
 use nucleo_f767zi::hal::can::Can;
 use nucleo_f767zi::hal::gpio::gpioa::{PA15, PA4, PA5, PA6, PA7};

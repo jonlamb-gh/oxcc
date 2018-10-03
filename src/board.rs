@@ -1,3 +1,5 @@
+//! Peripheral bootstrapping of the OxCC hardware environment
+
 use config;
 use cortex_m;
 use dac_mcp4922::Mcp4922;
@@ -191,7 +193,7 @@ impl FullBoard {
         let can2_rx = gpiob.pb12.into_af9(&mut gpiob.moder, &mut gpiob.afrh);
 
         // default clock configuration runs at 16 MHz
-        //let clocks = rcc.cfgr.freeze(&mut flash.acr);
+        // let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
         // TODO - enable OverDrive to get 216 MHz
         // configure maximum clock frequency at 200 MHz
@@ -212,11 +214,11 @@ impl FullBoard {
             &mut rcc.apb1,
         );
 
-        /* NOTE: the default config can fail if there are CAN bus or config issues */
-        /* &CanConfig::default(), */
-        /* loopback/silent mode can be used for testing */
-        /* &CanConfig { loopback_mode: true, silent_mode: true,
-         * ..CanConfig::default() }, */
+        // NOTE: the default config can fail if there are CAN bus or config issues
+        // &CanConfig::default(),
+        // loopback/silent mode can be used for testing
+        // &CanConfig { loopback_mode: true, silent_mode: true,
+        // ..CanConfig::default() },
         let control_can = Can::can1(
             peripherals.CAN1,
             (can1_tx, can1_rx),
