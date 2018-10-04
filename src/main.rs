@@ -11,8 +11,8 @@ extern crate cortex_m_rt as rt;
 #[cfg(feature = "panic-over-semihosting")]
 extern crate cortex_m_semihosting;
 extern crate embedded_hal;
-extern crate oxcc_nucleo_f767zi as nucleo_f767zi;
 extern crate num;
+extern crate oxcc_nucleo_f767zi as nucleo_f767zi;
 #[cfg(feature = "panic-over-abort")]
 extern crate panic_abort;
 #[cfg(feature = "panic-over-semihosting")]

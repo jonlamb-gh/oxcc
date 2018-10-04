@@ -8,9 +8,9 @@ A port of [Open Source Car Control](https://github.com/jonlamb-gh/oscc) written 
 
 It is built around the traits and patterns provided by the [embedded-hal](https://github.com/rust-embedded/embedded-hal)
 project and community:
-see the [BSP crate](https://github.com/jonlamb-gh/nucleo-f767zi),
-the [HAL crate](https://github.com/jonlamb-gh/stm32f767-hal),
-and the [device crate](https://github.com/adamgreig/stm32-rs/tree/master/stm32f7).
+see the [BSP crate](https://github.com/jonlamb-gh/oxcc-nucleo-f767zi),
+the [HAL crate](https://github.com/jonlamb-gh/oxcc-stm32f767-hal),
+and the [device crate](https://github.com/jonlamb-gh/oxcc-stm32f767).
 
 ### OSCC Divergence
 

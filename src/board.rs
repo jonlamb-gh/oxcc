@@ -6,7 +6,11 @@ use dac_mcp4922::Mcp4922;
 use dac_mcp4922::MODE as DAC_MODE;
 use dual_signal::HighLowReader;
 use nucleo_f767zi::debug_console::DebugConsole;
-use nucleo_f767zi::hal::adc::{Adc, AdcChannel, AdcPrescaler, AdcSampleTime};
+use nucleo_f767zi::hal::adc::Adc;
+use nucleo_f767zi::hal::adc::Channel as AdcChannel;
+use nucleo_f767zi::hal::adc::Prescaler as AdcPrescaler;
+use nucleo_f767zi::hal::adc::Resolution as AdcResolution;
+use nucleo_f767zi::hal::adc::SampleTime as AdcSampleTime;
 use nucleo_f767zi::hal::can::Can;
 use nucleo_f767zi::hal::iwdg::{Iwdg, IwdgConfig, WatchdogTimeout};
 use nucleo_f767zi::hal::prelude::*;
@@ -21,31 +25,48 @@ use vehicle::FAULT_HYSTERESIS;
 
 pub use types::*;
 
+/// Control module CAN report frame publish rate
+///
+/// Brake, throttle and steering modules will publish
+/// their report frames to the control CAN bus at
+/// this rate.
 pub const CAN_PUBLISH_HZ: u32 = 50;
 
-// TODO
-// We need to decide on a desired ADC sample time.
-//
-// The OSCC Arduino modules were likely using the
-// default configuration which is about 104 microseconds
-// per `analogRead()`.
-//
-// total conversion time = sampling time + 12 cycles
-// ADC clock = APB2 clock / prescaler
-// e.g our current config, 216 MHz, APB2 108 MHz
-//   ADCCLK = 108 / Prescaler4 = 27 MHz
-//   time = Cycles480 + 12 = 492 cycles == 18.22 us
-//
-//   ADCCLK = 108 / Prescaler6 = 18 MHz
-//   time = Cycles480 + 12 = 492 cycles == 27.33 us
-//
-// NOTE: prescaler must be chosen such that the ADC clock
-// does not exceed 30 MHz
+/// ADC configuration
+///
+/// The ADC(s) are configured to match the original OSCC
+/// Arduino resolution of 10 bits instead of the full 12 bit
+/// resolution.
+/// This allows existing vehicle configurations to be used without
+/// re-calibrating.
+///
+/// The OSCC Arduino builds were likely using the default ADC
+/// configuration which would give about 104 microseconds per
+/// `analogRead()`.
+///
+/// OxCC configures the ADC(s) such that the conversion time
+/// is about 18.26 microseconds.
+///
+/// Total conversion time = sampling time + 13 cycles for 10-bit resolution
+///   - APB2 clock = 216 MHz / 2
+///   - ADC clock = APB2 clock / prescaler = 108 / Prescaler4 = 27 MHz
+///   - conversion time = Cycles480 + 13 = 493 cycles == 18.26 us
+///
+/// **NOTE**
+/// Prescalers must be chosen such that the ADC clock
+/// does not exceed 30 MHz
 pub const ADC_PRESCALER: AdcPrescaler = AdcPrescaler::Prescaler4;
 pub const ADC_SAMPLE_TIME: AdcSampleTime = AdcSampleTime::Cycles480;
+pub const ADC_RESOLUTION: AdcResolution = AdcResolution::Bits10;
 
-// not sure if the averaging is needed, we might be able to just use a
-// single read with large Cycles480 sample time?
+/// Number of analog conversion samples read
+/// by the DAC signal discontinuity mechanism.
+///
+/// **NOTE**
+/// This is likely the result of poor ADC hardware on the original
+/// OSCC Arduino hardware. I suspect we can get rid of it now that
+/// we're using the full conversion time of Cycles480 which is
+/// pretty stable.
 pub const DAC_SAMPLE_AVERAGE_COUNT: u32 = 20;
 
 pub struct FullBoard {
@@ -199,6 +220,15 @@ impl FullBoard {
         // configure maximum clock frequency at 200 MHz
         let clocks = rcc.cfgr.freeze_max(&mut flash.acr);
 
+        // TODO - this can be moved into the HAL once it's aware of the clocks
+        let adc_clock = match ADC_PRESCALER {
+            AdcPrescaler::Prescaler2 => clocks.pclk2().0 / 2,
+            AdcPrescaler::Prescaler4 => clocks.pclk2().0 / 4,
+            AdcPrescaler::Prescaler6 => clocks.pclk2().0 / 6,
+            AdcPrescaler::Prescaler8 => clocks.pclk2().0 / 8,
+        };
+        assert!(adc_clock <= 30_000_000);
+
         let mut leds = Leds::new(led_r, led_g, led_b);
         for led in leds.iter_mut() {
             led.off();
@@ -294,13 +324,31 @@ impl FullBoard {
             control_can,
             obd_can,
             brake_pedal_position_sensor: BrakePedalPositionSensor {
-                adc1: Adc::adc1(peripherals.ADC1, &mut c_adc, &mut rcc.apb2, ADC_PRESCALER),
+                adc1: Adc::adc1(
+                    peripherals.ADC1,
+                    &mut c_adc,
+                    &mut rcc.apb2,
+                    ADC_PRESCALER,
+                    ADC_RESOLUTION,
+                ),
             },
             accelerator_position_sensor: AcceleratorPositionSensor {
-                adc2: Adc::adc2(peripherals.ADC2, &mut c_adc, &mut rcc.apb2, ADC_PRESCALER),
+                adc2: Adc::adc2(
+                    peripherals.ADC2,
+                    &mut c_adc,
+                    &mut rcc.apb2,
+                    ADC_PRESCALER,
+                    ADC_RESOLUTION,
+                ),
             },
             torque_sensor: TorqueSensor {
-                adc3: Adc::adc3(peripherals.ADC3, &mut c_adc, &mut rcc.apb2, ADC_PRESCALER),
+                adc3: Adc::adc3(
+                    peripherals.ADC3,
+                    &mut c_adc,
+                    &mut rcc.apb2,
+                    ADC_PRESCALER,
+                    ADC_RESOLUTION,
+                ),
             },
             brake_dac: Mcp4922::new(brake_spi, brake_nss),
             throttle_dac: Mcp4922::new(throttle_spi, throttle_nss),
