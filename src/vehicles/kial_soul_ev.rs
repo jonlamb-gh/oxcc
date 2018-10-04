@@ -105,9 +105,9 @@ pub const fn brake_position_to_volts_high(position: f32) -> f32 {
         + BRAKE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
 }
 
-/// Value of the accelerator position that indicates operator
+/// Value of the brake position that indicates operator
 /// override. \[steps\]
-pub const BRAKE_PEDAL_OVERRIDE_THRESHOLD: u16 = 130 << 2;
+pub const BRAKE_PEDAL_OVERRIDE_THRESHOLD: u16 = 130;
 
 /// Minimum value of the low spoof signal that activates the brake
 /// lights. \[steps\]
@@ -246,4 +246,4 @@ pub const fn throttle_position_to_volts_high(position: f32) -> f32 {
 
 /// Value of the accelerator position that indicates operator
 /// override. \[steps\]
-pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185 << 2;
+pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185;

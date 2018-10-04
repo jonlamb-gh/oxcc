@@ -269,6 +269,6 @@ pub const fn throttle_position_to_volts_high(position: f32) -> f32 {
         + THROTTLE_SPOOF_HIGH_SIGNAL_VOLTAGE_MIN
 }
 
-/// Value of the accelerator position that indicates operator
+/// Value of the brake position that indicates operator
 /// override. \[steps\]
-pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185 << 2;
+pub const ACCELERATOR_OVERRIDE_THRESHOLD: u32 = 185;
