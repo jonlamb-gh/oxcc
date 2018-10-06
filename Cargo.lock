@@ -128,7 +128,6 @@ dependencies = [
  "embedded-hal 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "oxcc-nucleo-f767zi 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "panic-abort 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "panic-semihosting 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -168,11 +167,6 @@ dependencies = [
  "oxcc-stm32f767 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "panic-abort"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "panic-semihosting"
@@ -275,7 +269,6 @@ dependencies = [
 "checksum oxcc-nucleo-f767zi 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "df4fc98258001ad387aa7678c79b66133d0775c5b5a857c25c3faef47121baa8"
 "checksum oxcc-stm32f767 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a425a931fa001f275999e77eb96de9a60c0b39e6051255c0e7120bd28e1f0117"
 "checksum oxcc-stm32f767-hal 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f941d9bcc6bf04cdf1e731ecc3b49477a96298b75852a6605dcc36a2c6589d4e"
-"checksum panic-abort 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2c14a66511ed17b6a8b4256b868d7fd207836d891db15eea5195dbcaf87e630f"
 "checksum panic-semihosting 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1017854db1621a236488ac359b89b19a56dcb1cb45127376d04f23128cea7210"
 "checksum proc-macro2 0.4.19 (registry+https://github.com/rust-lang/crates.io-index)" = "ffe022fb8c8bd254524b0b3305906c1921fa37a84a644e29079a9e62200c3901"
 "checksum quote 0.6.8 (registry+https://github.com/rust-lang/crates.io-index)" = "dd636425967c33af890042c483632d33fa7a18f19ad1d7ea72e8998c6ef8dea5"

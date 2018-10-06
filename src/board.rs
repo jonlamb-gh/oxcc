@@ -19,7 +19,7 @@ use nucleo_f767zi::hal::serial::Serial;
 use nucleo_f767zi::hal::spi::Spi;
 use nucleo_f767zi::hal::stm32f7x7;
 use nucleo_f767zi::hal::stm32f7x7::{ADC1, ADC2, ADC3, IWDG};
-use nucleo_f767zi::led::{Color, Leds};
+use nucleo_f767zi::led::Leds;
 use nucleo_f767zi::UserButtonPin;
 use vehicle::FAULT_HYSTERESIS;
 
@@ -511,25 +511,4 @@ impl HighLowReader for TorqueSensor {
     fn read_low(&self) -> u16 {
         self.adc3.read(AdcChannel::Adc3In8, ADC_SAMPLE_TIME)
     }
-}
-
-pub fn hard_fault_indicator() {
-    cortex_m::interrupt::free(|_cs| unsafe {
-        let peripherals = stm32f7x7::Peripherals::steal();
-        let mut rcc = peripherals.RCC.constrain();
-        let mut gpiob = peripherals.GPIOB.split(&mut rcc.ahb1);
-
-        let led_r = gpiob
-            .pb14
-            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
-        let led_g = gpiob
-            .pb0
-            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
-        let led_b = gpiob
-            .pb7
-            .into_push_pull_output(&mut gpiob.moder, &mut gpiob.otyper);
-
-        let mut leds = Leds::new(led_r, led_g, led_b);
-        leds[Color::Red].on();
-    });
 }

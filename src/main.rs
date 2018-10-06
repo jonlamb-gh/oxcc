@@ -5,6 +5,7 @@
 #![no_std]
 #![no_main]
 #![feature(const_fn)]
+#![cfg_attr(feature = "panic-abort", feature(core_intrinsics))]
 
 extern crate cortex_m;
 extern crate cortex_m_rt as rt;
@@ -13,8 +14,6 @@ extern crate cortex_m_semihosting;
 extern crate embedded_hal;
 extern crate num;
 extern crate oxcc_nucleo_f767zi as nucleo_f767zi;
-#[cfg(feature = "panic-over-abort")]
-extern crate panic_abort;
 #[cfg(feature = "panic-over-semihosting")]
 extern crate panic_semihosting;
 #[macro_use]
@@ -28,6 +27,8 @@ mod dtc;
 mod dual_signal;
 mod fault_condition;
 mod oxcc_error;
+#[cfg(feature = "panic-abort")]
+mod panic_abort;
 mod ranges;
 mod steering_module;
 mod throttle_module;
@@ -62,7 +63,7 @@ mod brake_module;
 #[path = "brake/kia_soul_petrol/brake_module.rs"]
 mod brake_module;
 
-use board::{hard_fault_indicator, FullBoard};
+use board::FullBoard;
 use brake_can_protocol::BrakeReportPublisher;
 use brake_module::{BrakeModule, UnpreparedBrakeModule};
 use can_gateway_module::CanGatewayModule;
@@ -357,19 +358,12 @@ fn handle_error(
     let _ = publish_reports(modules, can_gateway);
 }
 
-// TODO - any safety related things we can do in these contexts?
-// Might be worth implementing a panic handler here as well
-// For example:
-// - disable controls
-// - indication LED
 #[exception]
 fn HardFault(ef: &ExceptionFrame) -> ! {
-    hard_fault_indicator();
     panic!("HardFault at {:#?}", ef);
 }
 
 #[exception]
 fn DefaultHandler(irqn: i16) {
-    hard_fault_indicator();
     panic!("Unhandled exception (IRQn = {})", irqn);
 }
