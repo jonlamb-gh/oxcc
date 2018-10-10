@@ -95,38 +95,33 @@ fn serial3_panicinfo_dump(_cs: &CriticalSection, info: &PanicInfo) {
     let brr = pclk1.0 / baud_rate.0;
     usart.brr.write(|w| unsafe { w.bits(brr) });
 
-    // enable USART, tx, rx
+    // enable USART, tx
     usart.cr1.write(|w| w.ue().set_bit().te().set_bit());
 
     serial_println!("\n!!! WARNING !!!\n{}", info);
 }
 
-fn putchar(byte: u8) -> Result<(), ()> {
-    let isr = unsafe { (*stm32f7x7::USART3::ptr()).isr.read() };
+/// Blocking putchar function to be used by the panic handler only
+fn putchar(byte: u8) {
+    let mut isr = unsafe { (*stm32f7x7::USART3::ptr()).isr.read() };
 
-    if isr.txe().bit_is_set() && isr.tc().bit_is_set() {
-        unsafe { ptr::write_volatile(&(*stm32f7x7::USART3::ptr()).tdr as *const _ as *mut _, byte) }
-        Ok(())
-    } else {
-        Err(())
-    }
-}
+    if isr.txe().bit_is_set() {
+        unsafe {
+            ptr::write_volatile(&(*stm32f7x7::USART3::ptr()).tdr as *const _ as *mut _, byte);
+        }
 
-fn flush() -> Result<(), ()> {
-    let isr = unsafe { (*stm32f7x7::USART3::ptr()).isr.read() };
-
-    if isr.tc().bit_is_set() {
-        Ok(())
-    } else {
-        Err(())
+        // wait for completion
+        while {
+            isr = unsafe { (*stm32f7x7::USART3::ptr()).isr.read() };
+            isr.tc().bit_is_clear()
+        } {}
     }
 }
 
 impl ::core::fmt::Write for SerialOutputHandle {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         for &b in s.as_bytes() {
-            while putchar(b).is_err() {}
-            while flush().is_err() {}
+            putchar(b);
         }
         Ok(())
     }
